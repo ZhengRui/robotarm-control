@@ -6,8 +6,12 @@ import sys
 import cv2
 import numpy as np
 
+from .logger import get_logger
+
 VIDEO_SUFFIX = (".mp4", ".avi")
 IMAGE_SUFFIX = (".jpg", ".jpeg", ".png")
+
+logger = get_logger("factory")
 
 
 def sorted_alphanumeric(data):
@@ -22,7 +26,6 @@ def sorted_alphanumeric(data):
 
 class Factory:
     def __init__(self, source):
-
         try:
             if source.startswith(("http://", "https://")):
                 if source.endswith(IMAGE_SUFFIX):
@@ -81,15 +84,16 @@ class Factory:
                         self.source = cv2.VideoCapture(stream_url)
                         if self.source.isOpened():
                             init_succeed = True
-                            print(f"find usable stream: {height}x{width} {ext}")
+                            logger.info(f"find usable stream: {height}x{width} {ext}")
                             break
 
                     if not init_succeed:
                         raise Exception(f"opencv not able to load any stream source of {source}")
 
-            elif source.lower() == "webcam":
+            elif source.lower().startswith("webcam"):
+                cam_id = source.split(":")[1] if ":" in source else 0
                 self.type = "video"
-                self.source = cv2.VideoCapture(0)
+                self.source = cv2.VideoCapture(int(cam_id))
 
             else:
                 assert os.path.exists(source), "Source does not exists!"
@@ -113,7 +117,7 @@ class Factory:
                         raise Exception("Invalid source!")
 
         except Exception as err:
-            print(err)
+            logger.error(err)
             sys.exit(1)
 
     def pipeline(self, keep_size=True, max_size=800, lossy=True, jpg_quality=50):
@@ -133,7 +137,7 @@ class Factory:
                     yield msg
 
                 except Exception as err:
-                    print(f"Reading Error {img_path} {err}, skipped!")
+                    logger.error(f"Reading Error {img_path} {err}, skipped!")
 
         elif self.type == "video":
             i_frame = 0
@@ -156,7 +160,7 @@ class Factory:
                         break
 
                 except Exception as err:
-                    print(f"Reading Error {i_frame} {err}, skipped!")
+                    logger.error(f"Reading Error {i_frame} {err}, skipped!")
 
 
 def encode(im, i_frame=0, lossy=True, jpg_quality=0.5):
@@ -170,7 +174,7 @@ def encode(im, i_frame=0, lossy=True, jpg_quality=0.5):
             [int(cv2.IMWRITE_JPEG_QUALITY), jpg_quality],
         )
 
-    msg = f'{i_frame:010d}{h:010d}{w:010d}{lossy:010d}'.encode() + im.tobytes()
+    msg = f"{i_frame:010d}{h:010d}{w:010d}{lossy:010d}".encode() + im.tobytes()
     return msg
 
 
@@ -181,6 +185,7 @@ def decode(msg):
         im = cv2.imdecode(np.frombuffer(im_buf, dtype="uint8"), cv2.IMREAD_COLOR)
         assert im.shape[:2] == (h, w)
     else:
-        im = np.frombuffer(im_buf, dtype='uint8').reshape(h, w, -1)
+        im = np.frombuffer(im_buf, dtype="uint8").reshape(h, w, -1)
 
+    return i_frame, im
     return i_frame, im
