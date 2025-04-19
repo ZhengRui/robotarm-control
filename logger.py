@@ -26,7 +26,7 @@ def get_logger(name, log_level=logging.INFO, log_to_file=False, log_dir="logs"):
         logger.handlers.clear()
 
     # Create formatter
-    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
+    formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s", datefmt="%Y-%m-%d %H:%M:%S")
 
     # Create console handler
     console_handler = logging.StreamHandler(sys.stdout)
@@ -38,7 +38,7 @@ def get_logger(name, log_level=logging.INFO, log_to_file=False, log_dir="logs"):
         if not os.path.exists(log_dir):
             os.makedirs(log_dir)
 
-        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         log_file = os.path.join(log_dir, f"{name}_{timestamp}.log")
 
         file_handler = logging.FileHandler(log_file)
@@ -76,12 +76,12 @@ def critical(msg, *args, **kwargs):
 # Usage examples:
 #
 # 1. Simple usage with default logger:
-#    from logging import info, error
+#    from logger import info, error
 #    info("Application started")
 #    error("Something went wrong")
 #
 # 2. Create a custom logger:
-#    from logging import get_logger
+#    from logger import get_logger
 #    logger = get_logger("robot_arm", log_to_file=True)
 #    logger.info("Robot arm initialized")
 #    logger.error("Motor failure detected")
