@@ -1,14 +1,16 @@
+import argparse
 import json
 
 import imagezmq
 
 from utils.factory import decode
+from utils.load_handler import load_handler
 from utils.logger import get_logger
 
 logger = get_logger("server")
 
 
-def serv():
+def serv(handler):
     hub = imagezmq.ImageHub()
 
     try:
@@ -25,7 +27,7 @@ def serv():
             #     logger.info(f"{rpi_name} {i_frame}th frame: {frame.shape}")
 
             # image processing
-            res = "frame result"
+            res = handler.process(frame) if handler else None
             hub.send_reply(json.dumps(res).encode("utf-8"))
     except KeyboardInterrupt:
         logger.info("KeyboardInterrupt received, shutting down server.")
@@ -34,4 +36,13 @@ def serv():
 
 
 if __name__ == "__main__":
-    serv()
+    parser = argparse.ArgumentParser(description="Video Prototyping Server")
+    parser.add_argument(
+        "--handler",
+        type=str,
+        default=None,
+        help="Handler to serve",
+    )
+    args = parser.parse_args()
+    handler = load_handler(args.handler) if args.handler else None
+    serv(handler)

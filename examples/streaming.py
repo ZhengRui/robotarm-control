@@ -8,6 +8,7 @@ import cv2
 import imagezmq
 
 from utils.factory import Factory, decode
+from utils.load_handler import load_handler
 from utils.logger import get_logger
 
 logger = get_logger("streaming")
@@ -31,13 +32,14 @@ def stream(args):
     t_wait = 0 if (factory.type == "image" and not autoplay) else 10
     cv2.namedWindow("Demo", cv2.WINDOW_GUI_NORMAL)
     wnd_resized = False
+    handler = load_handler(args.handler) if args.handler else None
 
     display_file_name = args.display_file_name and factory.type == "image"
 
     for msg in factory.pipeline(keep_size=keep_size, max_size=max_size, lossy=lossy, jpg_quality=jpg_quality):
         try:
             reply = client.send_jpg(rpi_name, msg)
-            _ = json.loads(reply)
+            res = json.loads(reply)
 
         except Exception as err:
             logger.warning(f"Communication Error {err}!")
@@ -49,6 +51,8 @@ def stream(args):
             t0 = t1
 
         _, im = decode(msg)
+        if handler:
+            im = handler.visualize(im, res)
         h, w = im.shape[:2]
 
         if display_file_name:
@@ -139,6 +143,12 @@ if __name__ == "__main__":
         dest="display_file_name",
         action="store_true",
         help="Display file name in image output",
+    )
+    parser.add_argument(
+        "--handler",
+        type=str,
+        default=None,
+        help="Handler to process the frame and visualize the result",
     )
 
     args = parser.parse_args()

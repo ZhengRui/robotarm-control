@@ -26,7 +26,10 @@ def get_logger(name, log_level=logging.INFO, log_to_file=False, log_dir="logs"):
         logger.handlers.clear()
 
     # Create formatter
-    formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s", datefmt="%Y-%m-%d %H:%M:%S")
+    formatter = logging.Formatter(
+        "%(asctime)s, %(levelname)-8s [%(filename)s:%(funcName)s:%(lineno)d] %(message)s",
+        datefmt="%Y-%m-%d:%H:%M:%S",
+    )
 
     # Create console handler
     console_handler = logging.StreamHandler(sys.stdout)
