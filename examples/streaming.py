@@ -33,6 +33,7 @@ def stream(args):
     cv2.namedWindow("Demo", cv2.WINDOW_GUI_NORMAL)
     wnd_resized = False
     handler = load_handler(args.handler) if args.handler else None
+    is_paused = False  # Flag to track pause state
 
     display_file_name = args.display_file_name and factory.type == "image"
 
@@ -86,8 +87,12 @@ def stream(args):
             cv2.resizeWindow("Demo", (w, h))
             wnd_resized = True
 
-        if cv2.waitKey(0 if enable_freeze else t_wait) & 0xFF == ord("q"):
+        key = cv2.waitKey(0 if enable_freeze and is_paused else t_wait) & 0xFF
+        if key == ord("q"):
             break
+        elif key == ord(" ") and enable_freeze:  # Space key to toggle pause when enable_freeze is true
+            is_paused = not is_paused
+            logger.info("Stream " + ("paused" if is_paused else "resumed"))
 
     cv2.destroyAllWindows()
 
