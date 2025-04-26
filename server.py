@@ -2,15 +2,16 @@ import argparse
 import json
 
 import imagezmq
+import numpy as np
 
+from handlers import load_handler
 from utils.factory import decode
-from utils.load_handler import load_handler
 from utils.logger import get_logger
 
 logger = get_logger("server")
 
 
-def serv(handler):
+def serv(handler, debug=False):
     hub = imagezmq.ImageHub()
 
     try:
@@ -27,7 +28,11 @@ def serv(handler):
             #     logger.info(f"{rpi_name} {i_frame}th frame: {frame.shape}")
 
             # image processing
-            res = handler.process(frame) if handler else None
+            res = handler.process(frame, debug=debug) if handler else None
+
+            # Convert numpy ndarrays to lists for JSON serialization
+            res = {k: v.tolist() if isinstance(v, np.ndarray) else v for k, v in res.items()} if res else None
+
             hub.send_reply(json.dumps(res).encode("utf-8"))
     except KeyboardInterrupt:
         logger.info("KeyboardInterrupt received, shutting down server.")
@@ -43,6 +48,12 @@ if __name__ == "__main__":
         default=None,
         help="Handler to serve",
     )
+    parser.add_argument(
+        "--debug",
+        dest="debug",
+        action="store_true",
+        help="Debug mode",
+    )
     args = parser.parse_args()
     handler = load_handler(args.handler) if args.handler else None
-    serv(handler)
+    serv(handler, debug=args.debug)

@@ -1,7 +1,7 @@
 import cv2
 import numpy as np
 
-from .logger import get_logger
+from utils.logger import get_logger
 
 logger = get_logger("calibrate")
 
@@ -10,8 +10,8 @@ class CalibrateHandler:
     def __init__(self):
         self.wnd_size = None
 
-    def process(self, frame):
-        if not self.wnd_size or self.wnd_size != frame.shape[:2]:
+    def process(self, frame, debug=False):
+        if debug and (not self.wnd_size or self.wnd_size != frame.shape[:2]):
             logger.info(f"Resizing window to {frame.shape[1]}x{frame.shape[0]}")
             cv2.namedWindow("Calibrate", cv2.WINDOW_GUI_NORMAL)
             cv2.resizeWindow("Calibrate", frame.shape[1], frame.shape[0])
@@ -31,13 +31,12 @@ class CalibrateHandler:
 
         contours, _ = cv2.findContours(blur, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
 
-        # Initialize perspective_img outside the loop
-        # Use frame.shape to get height and width
         h, w = frame.shape[:2]
-        perspective_img = np.zeros((h, w, 3), dtype=np.uint8)  # Default black image
+        im_area = h * w
+        perspective_img = np.zeros((h, w, 3), dtype=np.uint8)
+        succeed = False
 
         for contour in contours:
-            im_area = im.shape[0] * im.shape[1]
             contour_area = cv2.contourArea(contour)
             if im_area / 2 < contour_area < im_area:
                 cv2.drawContours(im, [contour], -1, (0, 0, 255), 2)
@@ -71,15 +70,18 @@ class CalibrateHandler:
                     )
 
                     matrix = cv2.getPerspectiveTransform(src_pts, dst_pts)
-                    perspective_img = cv2.warpPerspective(frame, matrix, (w, h))
-
+                    succeed = True
                     break
 
-        cv2.imshow("Calibrate", im)
-        cv2.imshow("PerspectiveTransform", perspective_img)  # Show the result (transformed or black)
-        cv2.waitKey(10)
+        if debug:
+            if succeed:
+                perspective_img = cv2.warpPerspective(frame, matrix, (w, h))
 
-        return
+            cv2.imshow("Calibrate", im)
+            cv2.imshow("PerspectiveTransform", perspective_img)  # Show the result (transformed or black)
+            cv2.waitKey(10)
+
+        return {"pt_matrix": matrix if succeed else None}
 
     @staticmethod
     def visualize(frame, res):
