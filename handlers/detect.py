@@ -24,7 +24,7 @@ class YahboomDetectHandler:
             "blue": ((100, 43, 46), (124, 255, 255)),
             "yellow": ((26, 43, 46), (34, 255, 255)),
         },
-        coord_mapping_config={
+        coord_mapping_configs={
             "pixels_per_meter": [4200, 4000],
             "rotation_matrix": [[0, -1], [-1, 0]],
             "offset": [0.27, 0.0762],  # 480 / 4000 + 0.15, 320 / 4200
@@ -32,9 +32,9 @@ class YahboomDetectHandler:
     ):
         self.wnd_size = None
         self.color_hsv_thresholds = color_hsv_thresholds
-        self.coord_mapping_config = coord_mapping_config
+        self.coord_mapping_configs = coord_mapping_configs
 
-    def _detect_square(self, frame, color, debug=False):
+    def _detect_square(self, frame, color):
         (lowerb, upperb) = self.color_hsv_thresholds[color]
         im = frame.copy()
         hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
@@ -54,19 +54,19 @@ class YahboomDetectHandler:
         return contour
 
     def _coord_mapping(self, x, y, w=None, h=None):
-        cfg = self.coord_mapping_config
-        x /= cfg["pixels_per_meter"][0]
-        y /= cfg["pixels_per_meter"][1]
-        x = cfg["rotation_matrix"][0][0] * x + cfg["rotation_matrix"][0][1] * y
-        y = cfg["rotation_matrix"][1][0] * x + cfg["rotation_matrix"][1][1] * y
-        x += cfg["offset"][0]
-        y += cfg["offset"][1]
+        cfgs = self.coord_mapping_configs
+        x /= cfgs["pixels_per_meter"][0]
+        y /= cfgs["pixels_per_meter"][1]
+        x = cfgs["rotation_matrix"][0][0] * x + cfgs["rotation_matrix"][0][1] * y
+        y = cfgs["rotation_matrix"][1][0] * x + cfgs["rotation_matrix"][1][1] * y
+        x += cfgs["offset"][0]
+        y += cfgs["offset"][1]
 
         if w is not None and h is not None:
-            w /= cfg["pixels_per_meter"][0]
-            h /= cfg["pixels_per_meter"][1]
-            w = cfg["rotation_matrix"][0][0] * w + cfg["rotation_matrix"][0][1] * h
-            h = cfg["rotation_matrix"][1][0] * w + cfg["rotation_matrix"][1][1] * h
+            w /= cfgs["pixels_per_meter"][0]
+            h /= cfgs["pixels_per_meter"][1]
+            w = cfgs["rotation_matrix"][0][0] * w + cfgs["rotation_matrix"][0][1] * h
+            h = cfgs["rotation_matrix"][1][0] * w + cfgs["rotation_matrix"][1][1] * h
 
             return x, y, w, h
 
@@ -84,7 +84,7 @@ class YahboomDetectHandler:
 
         detections = []
         for color in self.color_hsv_thresholds:
-            contour = self._detect_square(frame, color, debug=debug)
+            contour = self._detect_square(frame, color)
             if contour is None:
                 continue
 

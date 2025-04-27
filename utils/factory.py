@@ -188,4 +188,3 @@ def decode(msg):
         im = np.frombuffer(im_buf, dtype="uint8").reshape(h, w, -1)
 
     return i_frame, im
-    return i_frame, im

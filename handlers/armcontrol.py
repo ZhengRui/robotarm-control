@@ -63,7 +63,7 @@ class YahboomArmControlHandler:
         self.mc.set_gripper_value(value, speed)
         time.sleep(delay)
 
-    def process(self, objects, speed=40, delay=1, debug=False):
+    def process(self, objects, speed=40, delay=1):
         done = []
         failed = []
 

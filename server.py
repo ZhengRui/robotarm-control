@@ -1,59 +1,81 @@
 import argparse
-import json
+import threading
 
-import imagezmq
-import numpy as np
-
-from handlers import load_handler
-from utils.factory import decode
+from pipelines import PipelineFactory
 from utils.logger import get_logger
 
 logger = get_logger("server")
 
 
-def serv(handler, debug=False):
-    hub = imagezmq.ImageHub()
+def serve_pipeline(pipeline_name, debug=False):
+    """Serve the pipeline and monitor its execution.
+
+    This function initializes the requested pipeline, sets up a callback
+    for when the pipeline exits, and waits for the pipeline to complete.
+
+    Args:
+        pipeline_name: Name of the pipeline to initialize and serve
+        debug: Whether to run in debug mode with visualizations
+
+    Raises:
+        ValueError: If the requested pipeline is not supported
+    """
+    # Initialize the pipeline using the factory
+    logger.info(f"Initializing pipeline: {pipeline_name}")
+    pipeline = PipelineFactory.create_pipeline(pipeline_name, debug=debug)
+
+    # Create a stop event for graceful shutdown
+    stop_event = threading.Event()
+
+    # Define the callback function that will be called when the pipeline exits
+    def on_pipeline_exit(success, error_message):
+        if success:
+            logger.info("Pipeline exited successfully")
+        else:
+            # Log the error with full traceback in the main thread
+            logger.error(f"Pipeline exited with error: {error_message}")
+        # Signal the main thread to exit
+        stop_event.set()
+
+    # Set the callback on the pipeline
+    pipeline.set_exit_callback(on_pipeline_exit)
 
     try:
-        while True:
-            try:
-                rpi_name, msg = hub.recv_jpg()
-                i_frame, frame = decode(msg.bytes)
-                assert frame.size
-            except Exception as err:
-                logger.warning(f"Communication Error {err}!")
-                continue  # Continue listening even if one message fails
+        logger.info(f"Server started with {pipeline.pipeline_name} pipeline (debug={debug})")
 
-            # if i_frame % 100 == 0:
-            #     logger.info(f"{rpi_name} {i_frame}th frame: {frame.shape}")
+        # Wait for the pipeline to exit or for a keyboard interrupt
+        stop_event.wait()
 
-            # image processing
-            res = handler.process(frame, debug=debug) if handler else None
-
-            # Convert numpy ndarrays to lists for JSON serialization
-            res = {k: v.tolist() if isinstance(v, np.ndarray) else v for k, v in res.items()} if res else None
-
-            hub.send_reply(json.dumps(res).encode("utf-8"))
     except KeyboardInterrupt:
-        logger.info("KeyboardInterrupt received, shutting down server.")
+        logger.info("KeyboardInterrupt received, shutting down server")
+        pipeline.signal("stop")  # Signal pipeline to stop
+        # Wait briefly for the pipeline to process the stop signal
+        stop_event.wait(timeout=2.0)
     finally:
-        hub.close()
+        # Ensure pipeline is stopped even if the callback wasn't triggered
+        pipeline.stop()
+        logger.info("Server shutdown complete")
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Video Prototyping Server")
+    parser = argparse.ArgumentParser(description="Robot Arm Control Server")
     parser.add_argument(
-        "--handler",
+        "--pipeline",
         type=str,
-        default=None,
-        help="Handler to serve",
+        default="yahboom_pick_and_place",
+        help="Pipeline to use (default: yahboom_pick_and_place)",
     )
     parser.add_argument(
         "--debug",
         dest="debug",
         action="store_true",
-        help="Debug mode",
+        help="Enable debug mode with visualizations",
     )
     args = parser.parse_args()
-    handler = load_handler(args.handler) if args.handler else None
-    serv(handler, debug=args.debug)
+
+    try:
+        serve_pipeline(args.pipeline, debug=args.debug)
+    except ValueError as e:
+        logger.error(f"Pipeline error: {e}")
+    except Exception as e:
+        logger.error(f"Unexpected error: {e}", exc_info=True)
