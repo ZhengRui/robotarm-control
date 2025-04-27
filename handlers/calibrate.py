@@ -7,31 +7,42 @@ logger = get_logger("calibrate")
 
 
 class CalibrateHandler:
-    def __init__(self):
+    def __init__(self, name="yahboom", **kwargs):
+        if name == "yahboom":
+            self.handler = YahboomCalibrateHandler()
+
+    def process(self, frame, debug=False, **kwargs):
+        return self.handler.process(frame, debug=debug, **kwargs)
+
+
+class YahboomCalibrateHandler:
+    def __init__(self, binary_threshold=140):
         self.wnd_size = None
+        self.binary_threshold = binary_threshold
 
     def process(self, frame, debug=False):
-        if debug and (not self.wnd_size or self.wnd_size != frame.shape[:2]):
-            logger.info(f"Resizing window to {frame.shape[1]}x{frame.shape[0]}")
+        h, w = frame.shape[:2]
+
+        if debug and (not self.wnd_size or self.wnd_size != (h, w)):
+            logger.info(f"Resizing window to {w}x{h}")
             cv2.namedWindow("Calibrate", cv2.WINDOW_GUI_NORMAL)
-            cv2.resizeWindow("Calibrate", frame.shape[1], frame.shape[0])
+            cv2.resizeWindow("Calibrate", w, h)
 
             cv2.namedWindow("PerspectiveTransform", cv2.WINDOW_GUI_NORMAL)
-            cv2.resizeWindow("PerspectiveTransform", frame.shape[1], frame.shape[0])
+            cv2.resizeWindow("PerspectiveTransform", w, h)
 
-            self.wnd_size = frame.shape[:2]
+            self.wnd_size = (h, w)
 
         im = frame.copy()
         gray = cv2.cvtColor(im, cv2.COLOR_BGR2GRAY)
         gray = cv2.GaussianBlur(gray, (5, 5), 1)
-        ref, threshold = cv2.threshold(gray, 140, 255, cv2.THRESH_BINARY)
+        _, threshold = cv2.threshold(gray, self.binary_threshold, 255, cv2.THRESH_BINARY)
 
         kernel = np.ones((3, 3), np.uint8)
         blur = cv2.morphologyEx(threshold, cv2.MORPH_OPEN, kernel, iterations=4)
 
         contours, _ = cv2.findContours(blur, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
 
-        h, w = frame.shape[:2]
         im_area = h * w
         perspective_img = np.zeros((h, w, 3), dtype=np.uint8)
         succeed = False
@@ -82,7 +93,3 @@ class CalibrateHandler:
             cv2.waitKey(10)
 
         return {"pt_matrix": matrix if succeed else None}
-
-    @staticmethod
-    def visualize(frame, res):
-        return frame.copy()
