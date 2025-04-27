@@ -15,8 +15,11 @@ dependencies = [
 dev = [
     "ipdb>=0.13.13",
     "ipython>=8.12.3",
+    "mypy>=1.14.1",
     "pre-commit>=3.5.0",
     "ruff>=0.11.6",
+    "types-pyyaml>=6.0.12.20241230",
+    "types-requests>=2.32.0.20241016",
 ]
 
 [tool.ruff]
@@ -29,3 +32,11 @@ fix = true
 quote-style = "double"
 indent-style = "space"
 line-ending = "lf"
+
+[[tool.mypy.overrides]]
+module = [
+    "pymycobot.*",
+    "youtube_dl.*",
+    "imagezmq.*"
+]
+ignore_missing_imports = true

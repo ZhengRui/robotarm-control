@@ -1,9 +1,10 @@
 import time
 from enum import Enum
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
-from utils.logger import get_logger
+import numpy as np
 
+from ..utils.logger import get_logger
 from .base import BasePipeline
 
 # Create module-level logger
@@ -53,10 +54,10 @@ class YahboomPickAndPlacePipeline(BasePipeline):
         self.state = PipelineState.IDLE
 
         # Store detected objects
-        self.detected_objects = []
+        self.detected_objects: List[Dict[str, Any]] = []
 
         # A buffer for the latest frame
-        self.current_frame = None
+        self.current_frame: Optional[np.ndarray] = None
 
         # Call parent constructor - this will start the pipeline thread
         super().__init__(pipeline_name="yahboom_pick_and_place", config_override=config_override, debug=debug)

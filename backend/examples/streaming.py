@@ -7,8 +7,8 @@ import time
 import cv2
 import imagezmq
 
-from utils.factory import Factory, decode
-from utils.logger import get_logger
+from lib.utils.factory import Factory, decode
+from lib.utils.logger import get_logger
 
 logger = get_logger("streaming")
 

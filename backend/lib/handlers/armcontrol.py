@@ -3,7 +3,7 @@ import time
 from pymycobot import MyCobot280
 from pymycobot.genre import Coord
 
-from utils.logger import get_logger
+from ..utils.logger import get_logger
 
 logger = get_logger("armcontrol")
 

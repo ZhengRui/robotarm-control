@@ -1,0 +1,24 @@
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.11.6
+    hooks:
+      - id: ruff
+        types_or: [ python, pyi ]
+        args: [--fix]
+        files: ^backend/
+        entry: bash -c 'cd backend && ruff check .'
+      - id: ruff-format
+        types_or: [ python, pyi ]
+        files: ^backend/
+        entry: bash -c 'cd backend && ruff format .'
+
+  - repo: local
+    hooks:
+      - id: mypy
+        name: mypy
+        files: ^backend/
+        entry: bash -c 'cd backend && mypy .'
+        language: system
+        types: [python]
+        require_serial: true
+        verbose: true

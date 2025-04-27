@@ -1,8 +1,8 @@
 import argparse
 import threading
 
-from pipelines import PipelineFactory
-from utils.logger import get_logger
+from .pipelines import PipelineFactory
+from .utils.logger import get_logger
 
 logger = get_logger("server")
 

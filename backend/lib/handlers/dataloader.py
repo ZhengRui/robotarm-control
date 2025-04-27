@@ -2,8 +2,8 @@ import time
 
 import imagezmq
 
-from utils.factory import decode
-from utils.logger import get_logger
+from ..utils.factory import decode
+from ..utils.logger import get_logger
 
 logger = get_logger("dataloader")
 

@@ -7,8 +7,8 @@ from typing import Any, Callable, Dict, Optional
 import yaml
 from deepmerge import Merger
 
-from handlers import HandlerFactory
-from utils.logger import get_logger
+from ..handlers import HandlerFactory
+from ..utils.logger import get_logger
 
 # Create module-level logger
 logger = get_logger("pipeline")
@@ -65,11 +65,11 @@ class BasePipeline(ABC):
         logger.info(f"Pipeline '{pipeline_name}' initialized handlers: {', '.join(self.handlers.keys())}")
 
         self.running = False
-        self.thread = None
-        self.on_exit_callback = None
+        self.thread: Optional[threading.Thread] = None
+        self.on_exit_callback: Optional[Callable[[bool, Optional[str]], None]] = None
 
         # Create signal queue for user interactions
-        self.signal_queue = queue.Queue()
+        self.signal_queue: queue.Queue[str] = queue.Queue()
 
         try:
             self.start()
@@ -265,4 +265,5 @@ class BasePipeline(ABC):
         This method should be implemented by subclasses to define the
         pipeline's processing logic based on its current state.
         """
+        pass
         pass
