@@ -2,7 +2,7 @@ import os
 import queue
 import threading
 from abc import ABC, abstractmethod
-from typing import Any, Callable, Dict, Optional
+from typing import Any, Callable, Dict, List, Optional
 
 import yaml
 from deepmerge import Merger
@@ -76,6 +76,33 @@ class BasePipeline(ABC):
         except Exception as e:
             logger.error(f"Failed to start pipeline '{pipeline_name}': {e}")
             raise RuntimeError(f"Failed to start pipeline '{pipeline_name}': {e}")
+
+    @property
+    def available_signals(self) -> List[str]:
+        """Return the available signals for this pipeline.
+
+        Returns:
+            List of signal strings that can be sent to this pipeline
+        """
+        return []  # Base implementation returns empty list
+
+    @property
+    def available_states(self) -> List[str]:
+        """Return the available states for this pipeline.
+
+        Returns:
+            List of possible state strings for this pipeline
+        """
+        return []  # Base implementation returns empty list
+
+    @property
+    def current_state(self) -> Optional[str]:
+        """Return the current state of the pipeline.
+
+        Returns:
+            Current state as a string, or None if not applicable
+        """
+        return None  # Base implementation returns None
 
     def _load_config(self) -> Dict[str, Any]:
         """Load configuration from default.yaml.

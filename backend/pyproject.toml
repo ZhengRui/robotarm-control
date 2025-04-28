@@ -6,9 +6,11 @@ readme = "README.md"
 requires-python = ">=3.8.10"
 dependencies = [
     "deepmerge>=2.0",
+    "fastapi",
     "imagezmq>=1.2.0",
     "opencv-python>=4.11.0.86",
     "pymycobot>=3.9.7",
+    "uvicorn>=0.33.0",
 ]
 
 [dependency-groups]

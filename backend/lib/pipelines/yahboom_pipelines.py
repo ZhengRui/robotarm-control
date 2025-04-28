@@ -69,6 +69,33 @@ class YahboomPickAndPlacePipeline(BasePipeline):
         # Call parent constructor - this will start the pipeline thread
         super().__init__(pipeline_name="yahboom_pick_and_place", config_override=config_override, debug=debug)
 
+    @property
+    def available_signals(self) -> List[str]:
+        """Return the available signals for this pipeline.
+
+        Returns:
+            List of signal strings that can be sent to this pipeline
+        """
+        return [signal.value for signal in PipelineSignal]
+
+    @property
+    def available_states(self) -> List[str]:
+        """Return the available states for this pipeline.
+
+        Returns:
+            List of possible state strings for this pipeline
+        """
+        return [state.value for state in PipelineState]
+
+    @property
+    def current_state(self) -> str:
+        """Return the current state of the pipeline.
+
+        Returns:
+            Current state as a string
+        """
+        return self.state.value
+
     def handle_signal(self, signal: str) -> None:
         """Handle user signals for state transitions.
 
@@ -77,15 +104,15 @@ class YahboomPickAndPlacePipeline(BasePipeline):
         """
         logger.info(f"Handling signal: {signal} in state: {self.state.value}")
 
-        if signal == "calibration_confirmed" and self.state == PipelineState.CALIBRATING:
+        if signal == PipelineSignal.CALIBRATION_CONFIRMED.value and self.state == PipelineState.CALIBRATING:
             logger.info("Calibration confirmed, transitioning to detection state")
             self.state = PipelineState.DETECTING
 
-        elif signal == "start_pick_place" and self.state == PipelineState.DETECTING:
+        elif signal == PipelineSignal.START_PICK_PLACE.value and self.state == PipelineState.DETECTING:
             logger.info("Starting pick and place operation")
             self.state = PipelineState.PICKING_PLACING
 
-        elif signal == "stop":
+        elif signal == PipelineSignal.STOP.value:
             logger.info("Stopping pipeline due to stop signal")
             self.state = PipelineState.STOPPED
             self.running = False
