@@ -1,3 +1,4 @@
+import json
 import time
 from typing import Any, Dict
 
@@ -71,6 +72,6 @@ class DataLoaderHandler:
             logger.info(f"{rpi_name} {i_frame}th frame: {frame.shape}")
 
         # Send reply to acknowledge receipt
-        self.hub.send_reply(b"OK")
+        self.hub.send_reply(json.dumps({"status": "OK"}).encode('utf-8'))
 
         return {"frame": frame}

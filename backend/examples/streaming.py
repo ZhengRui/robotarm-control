@@ -6,7 +6,6 @@ import time
 
 import cv2
 import imagezmq
-
 from lib.utils.factory import Factory, decode
 from lib.utils.logger import get_logger
 
@@ -49,7 +48,8 @@ def stream(args: argparse.Namespace) -> None:
             fps = d_frame / (t1 - t0)
             t0 = t1
 
-        _, im = decode(msg)
+        _, im_readonly = decode(msg)
+        im = im_readonly.copy()
         h, w = im.shape[:2]
 
         if display_file_name and isinstance(factory.source, list):

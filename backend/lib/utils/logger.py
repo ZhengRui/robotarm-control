@@ -33,6 +33,9 @@ def get_logger(
     if logger.hasHandlers():
         logger.handlers.clear()
 
+    # Disable propagation to parent loggers to prevent duplicate logs
+    logger.propagate = False
+
     # Create formatter
     formatter = logging.Formatter(
         "%(asctime)s, %(levelname)-8s [%(filename)s:%(funcName)s:%(lineno)d] %(message)s",
