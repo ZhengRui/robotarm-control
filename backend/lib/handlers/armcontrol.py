@@ -1,4 +1,5 @@
 import time
+from typing import Any, Dict, List, Tuple
 
 from pymycobot import MyCobot280
 from pymycobot.genre import Coord
@@ -9,21 +10,21 @@ logger = get_logger("armcontrol")
 
 
 class ArmControlHandler:
-    def __init__(self, name="yahboom", **kwargs):
+    def __init__(self, name: str = "yahboom", **kwargs: Any) -> None:
         if name == "yahboom":
             self.handler = YahboomArmControlHandler(**kwargs)
 
-    def process(self, frame, debug=False, **kwargs):
-        return self.handler.process(frame, debug=debug, **kwargs)
+    def process(self, objects: List[Dict[str, Any]], debug: bool = False, **kwargs: Any) -> Dict[str, Any]:
+        return self.handler.process(objects, debug=debug, **kwargs)
 
 
 class YahboomArmControlHandler:
     def __init__(
         self,
-        task="pick_and_place",
-        grasp_offset=(0.005, 0),
-        init_angles=[39, 0, 0, -71, -8, -8],
-        coord_config={
+        task: str = "pick_and_place",
+        grasp_offset: Tuple[float, float] = (0.005, 0),
+        init_angles: List[int] = [39, 0, 0, -71, -8, -8],
+        coord_config: Dict[str, Any] = {
             "pre_grasp_z": 170,
             "grasp_z": 115,
             "post_grasp_z": 170,
@@ -35,37 +36,55 @@ class YahboomArmControlHandler:
             },
             "stack": {"first": [135, -155, 115, -175, 0, -45], "delta_z": 30},
         },
-        gripper_config={
+        gripper_config: Dict[str, int] = {
             "open": 100,
             "close": 20,
         },
-    ):
+    ) -> None:
         self.task = task
         self.grasp_offset = grasp_offset
         self.mc = MyCobot280(port="/dev/ttyUSB0", baudrate=1000000)
         self.init_angles = init_angles
+        self.coord_config = coord_config
+        self.gripper_config = gripper_config
         self._reset()
 
-    def _reset(self):
+    def _reset(self) -> None:
         self.mc.send_angles(self.init_angles, 40)
         time.sleep(0.5)
 
-    def _move_to_coord(self, x, y, z, rx=-175, ry=0, rz=-45, speed=40, delay=1):
+    def _move_to_coord(
+        self,
+        x: float,
+        y: float,
+        z: float,
+        rx: float = -175,
+        ry: float = 0,
+        rz: float = -45,
+        speed: int = 40,
+        delay: float = 1,
+    ) -> None:
         coords = [x, y, z, rx, ry, rz]
         self.mc.send_coords(coords, speed, 0)
         time.sleep(delay)
 
-    def _move_to_z(self, z, speed=40, delay=1):
+    def _move_to_z(self, z: float, speed: int = 40, delay: float = 1) -> None:
         self.mc.send_coord(Coord.Z.value, z, speed)
         time.sleep(delay)
 
-    def _set_gripper_value(self, value, speed=40, delay=1):
+    def _set_gripper_value(self, value: int, speed: int = 40, delay: float = 1) -> None:
         self.mc.set_gripper_value(value, speed)
         time.sleep(delay)
 
-    def process(self, objects, speed=40, delay=1):
-        done = []
-        failed = []
+    def process(
+        self,
+        objects: List[Dict[str, Any]],
+        speed: int = 40,
+        delay: float = 1,
+        **kwargs: Any,
+    ) -> Dict[str, Any]:
+        done: List[Dict[str, Any]] = []
+        failed: List[Dict[str, Any]] = []
 
         for obj in objects:
             label = obj["label"]
@@ -94,13 +113,13 @@ class YahboomArmControlHandler:
                 coords = self.coord_config["stack"]["first"]
                 coords[2] += self.coord_config["stack"]["delta_z"] * (len(done) - 1)
 
-            self._move_to_coord(*coords, speed=speed, delay=delay)
+            x, y, z, rx, ry, rz = coords
+
+            self._move_to_coord(x, y, z, rx, ry, rz, speed=speed, delay=delay)
 
             self._set_gripper_value(self.gripper_config["open"], speed=speed, delay=delay)
 
-            coords[2] += 30
-
-            self._move_to_coord(*coords, speed=speed, delay=delay)
+            self._move_to_coord(x, y, z + 30, rx, ry, rz, speed=speed, delay=delay)
 
             self._reset()
 

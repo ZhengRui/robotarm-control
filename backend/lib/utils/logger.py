@@ -1,10 +1,16 @@
 import logging
-import os
 import sys
 from datetime import datetime
+from pathlib import Path
+from typing import Any
+
+# Determine the backend directory (2 levels up from the utils directory)
+BACKEND_ROOT = Path(__file__).resolve().parent.parent.parent
 
 
-def get_logger(name, log_level=logging.INFO, log_to_file=False, log_dir="logs"):
+def get_logger(
+    name: str, log_level: int = logging.INFO, log_to_file: bool = False, log_dir: str = "logs"
+) -> logging.Logger:
     """
     Create and return a logger with the given name and configuration.
 
@@ -12,7 +18,9 @@ def get_logger(name, log_level=logging.INFO, log_to_file=False, log_dir="logs"):
         name (str): The name of the logger
         log_level (int): The logging level (default: logging.INFO)
         log_to_file (bool): Whether to log to a file (default: False)
-        log_dir (str): Directory to store log files if log_to_file is True
+        log_dir (str): Directory to store log files if log_to_file is True.
+                       If relative path, it will be relative to the backend directory.
+                       If absolute path, it will be used as is.
 
     Returns:
         logging.Logger: Configured logger instance
@@ -38,13 +46,20 @@ def get_logger(name, log_level=logging.INFO, log_to_file=False, log_dir="logs"):
 
     # Add file handler if requested
     if log_to_file:
-        if not os.path.exists(log_dir):
-            os.makedirs(log_dir)
+        # Handle relative vs absolute paths
+        log_path = Path(log_dir)
+        if not log_path.is_absolute():
+            # If it's a relative path, make it relative to the project root
+            log_path = BACKEND_ROOT / log_path
+
+        # Create directory if it doesn't exist
+        if not log_path.exists():
+            log_path.mkdir(parents=True, exist_ok=True)
 
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        log_file = os.path.join(log_dir, f"{name}_{timestamp}.log")
+        log_file = log_path / f"{name}_{timestamp}.log"
 
-        file_handler = logging.FileHandler(log_file)
+        file_handler = logging.FileHandler(str(log_file))
         file_handler.setFormatter(formatter)
         logger.addHandler(file_handler)
 
@@ -56,23 +71,23 @@ default_logger = get_logger("default")
 
 
 # Convenience methods to avoid having to import both logging and this module
-def debug(msg, *args, **kwargs):
+def debug(msg: Any, *args: Any, **kwargs: Any) -> None:
     default_logger.debug(msg, *args, **kwargs)
 
 
-def info(msg, *args, **kwargs):
+def info(msg: Any, *args: Any, **kwargs: Any) -> None:
     default_logger.info(msg, *args, **kwargs)
 
 
-def warning(msg, *args, **kwargs):
+def warning(msg: Any, *args: Any, **kwargs: Any) -> None:
     default_logger.warning(msg, *args, **kwargs)
 
 
-def error(msg, *args, **kwargs):
+def error(msg: Any, *args: Any, **kwargs: Any) -> None:
     default_logger.error(msg, *args, **kwargs)
 
 
-def critical(msg, *args, **kwargs):
+def critical(msg: Any, *args: Any, **kwargs: Any) -> None:
     default_logger.critical(msg, *args, **kwargs)
 
 

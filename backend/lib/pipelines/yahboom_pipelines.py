@@ -2,6 +2,7 @@ import time
 from enum import Enum
 from typing import Any, Dict, List, Optional
 
+import cv2
 import numpy as np
 
 from ..utils.logger import get_logger
@@ -58,6 +59,12 @@ class YahboomPickAndPlacePipeline(BasePipeline):
 
         # A buffer for the latest frame
         self.current_frame: Optional[np.ndarray] = None
+
+        # Store the perspective transformed frame
+        self.current_pt_frame: Optional[np.ndarray] = None
+
+        # Store the perspective transformation matrix
+        self.pt_matrix: Optional[np.ndarray] = None
 
         # Call parent constructor - this will start the pipeline thread
         super().__init__(pipeline_name="yahboom_pick_and_place", config_override=config_override, debug=debug)
@@ -137,6 +144,11 @@ class YahboomPickAndPlacePipeline(BasePipeline):
 
             if result and "frame" in result:
                 self.current_frame = result["frame"]
+
+                # Update perspective transformed frame if we have a transformation matrix
+                if self.pt_matrix is not None and self.current_frame is not None:
+                    h, w = self.current_frame.shape[:2]
+                    self.current_pt_frame = cv2.warpPerspective(self.current_frame, self.pt_matrix, (w, h))
             else:
                 logger.warning("DataLoader did not return a valid frame")
         except Exception as e:
@@ -154,7 +166,17 @@ class YahboomPickAndPlacePipeline(BasePipeline):
             process_params = self.config.get("calibrate", {}).get("process", {})
 
             # Process frame with calibration handler
-            self.handlers["calibrate"].process(self.current_frame, debug=self.debug, **process_params)
+            result = self.handlers["calibrate"].process(self.current_frame, debug=self.debug, **process_params)
+
+            # Store the perspective transformation matrix
+            if result and "pt_matrix" in result:
+                self.pt_matrix = result["pt_matrix"]
+                if self.pt_matrix is not None and self.current_frame is not None:
+                    h, w = self.current_frame.shape[:2]
+                    self.current_pt_frame = cv2.warpPerspective(self.current_frame, self.pt_matrix, (w, h))
+                    logger.info("Perspective transformation matrix applied successfully")
+                else:
+                    logger.warning("Failed to apply perspective transformation matrix")
         except Exception as e:
             logger.error(f"Error in calibration processing: {e}")
 
@@ -168,15 +190,19 @@ class YahboomPickAndPlacePipeline(BasePipeline):
             # Get process parameters for detection
             process_params = self.config.get("detect", {}).get("process", {})
 
-            # Process frame with detection handler
-            result = self.handlers["detect"].process(self.current_frame, debug=self.debug, **process_params)
+            # Use the perspective transformed frame if available
+            frame_to_process = self.current_pt_frame if self.current_pt_frame is not None else self.current_frame
 
-            if result and "objects" in result:
-                self.detected_objects = result["objects"]
-                if self.detected_objects:
-                    logger.info(f"Detected {len(self.detected_objects)} objects")
+            # Process frame with detection handler - returns a list of detections directly
+            self.detected_objects = self.handlers["detect"].process(
+                frame_to_process, debug=self.debug, **process_params
+            )
+
+            if self.detected_objects:
+                logger.info(f"Detected {len(self.detected_objects)} objects")
         except Exception as e:
             logger.error(f"Error in detection processing: {e}")
+            self.detected_objects = []
 
     def _process_pick_and_place(self) -> None:
         """Process pick and place operation with the arm control handler."""

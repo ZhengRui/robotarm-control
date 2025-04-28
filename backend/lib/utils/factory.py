@@ -2,30 +2,31 @@ import os
 import re
 import shutil
 import sys
+from typing import Generator, List, Tuple, Union
 
 import cv2
 import numpy as np
 
 from .logger import get_logger
 
-VIDEO_SUFFIX = (".mp4", ".avi")
-IMAGE_SUFFIX = (".jpg", ".jpeg", ".png")
+VIDEO_SUFFIX: Tuple[str, ...] = (".mp4", ".avi")
+IMAGE_SUFFIX: Tuple[str, ...] = (".jpg", ".jpeg", ".png")
 
 logger = get_logger("factory")
 
 
-def sorted_alphanumeric(data):
-    def convert(text):
+def sorted_alphanumeric(data: List[str]) -> List[str]:
+    def convert(text: str) -> Union[int, str]:
         return int(text) if text.isdigit() else text.lower()
 
-    def alphanum_key(key):
+    def alphanum_key(key: str) -> List[Union[int, str]]:
         return [convert(c) for c in re.split("([0-9]+)", key)]
 
     return sorted(data, key=alphanum_key)
 
 
 class Factory:
-    def __init__(self, source):
+    def __init__(self, source: str):
         try:
             if source.startswith(("http://", "https://")):
                 if source.endswith(IMAGE_SUFFIX):
@@ -38,8 +39,8 @@ class Factory:
                     with open(tmp_source, "wb") as of:
                         try:
                             shutil.copyfileobj(resp.raw, of)
-                            self.source = [tmp_source]
-                            self.type = "image"
+                            self.source: Union[List[str], cv2.VideoCapture] = [tmp_source]
+                            self.type: str = "image"
                         except Exception:
                             if os.path.exists(tmp_source):
                                 os.remove(tmp_source)
@@ -55,7 +56,7 @@ class Factory:
 
                     import youtube_dl
 
-                    ydl_opts = {}
+                    ydl_opts = {}  # type: ignore
                     ydl = youtube_dl.YoutubeDL(ydl_opts)
                     info_dict = ydl.extract_info(source, download=False)
 
@@ -65,7 +66,7 @@ class Factory:
                     if formats is None:
                         raise Exception(f"youtube-dl not able to extract info of {source}")
 
-                    urls = []
+                    urls: List[Tuple[int, str, int, str]] = []
                     for fmt in formats:
                         height, width, ext, url = (
                             fmt.get("height"),
@@ -120,9 +121,11 @@ class Factory:
             logger.error(err)
             sys.exit(1)
 
-    def pipeline(self, keep_size=True, max_size=800, lossy=True, jpg_quality=50):
+    def pipeline(
+        self, keep_size: bool = True, max_size: int = 800, lossy: bool = True, jpg_quality: int = 50
+    ) -> Generator[bytes, None, None]:
         if self.type == "image":
-            for i_frame, img_path in enumerate(self.source):
+            for i_frame, img_path in enumerate(self.source):  # type: ignore
                 try:
                     im = cv2.imread(img_path, cv2.IMREAD_COLOR)
                     assert im.size
@@ -143,7 +146,7 @@ class Factory:
             i_frame = 0
             while True:
                 try:
-                    ret, im = self.source.read()
+                    ret, im = self.source.read()  # type: ignore
                     if ret:
                         assert im.size
 
@@ -163,7 +166,7 @@ class Factory:
                     logger.error(f"Reading Error {i_frame} {err}, skipped!")
 
 
-def encode(im, i_frame=0, lossy=True, jpg_quality=0.5):
+def encode(im: np.ndarray, i_frame: int = 0, lossy: bool = True, jpg_quality: int = 50) -> bytes:
     assert im.size and im.dtype == np.uint8
     h, w = im.shape[:2]
 
@@ -178,7 +181,7 @@ def encode(im, i_frame=0, lossy=True, jpg_quality=0.5):
     return msg
 
 
-def decode(msg):
+def decode(msg: bytes) -> Tuple[int, np.ndarray]:
     i_frame, h, w, encoded, im_buf = int(msg[:10]), int(msg[10:20]), int(msg[20:30]), bool(int(msg[30:40])), msg[40:]
 
     if encoded:

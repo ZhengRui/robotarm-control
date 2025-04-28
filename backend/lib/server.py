@@ -1,5 +1,6 @@
 import argparse
 import threading
+from typing import Optional
 
 from .pipelines import PipelineFactory
 from .utils.logger import get_logger
@@ -7,7 +8,7 @@ from .utils.logger import get_logger
 logger = get_logger("server")
 
 
-def serve_pipeline(pipeline_name, debug=False):
+def serve_pipeline(pipeline_name: str, debug: bool = False) -> None:
     """Serve the pipeline and monitor its execution.
 
     This function initializes the requested pipeline, sets up a callback
@@ -28,7 +29,7 @@ def serve_pipeline(pipeline_name, debug=False):
     stop_event = threading.Event()
 
     # Define the callback function that will be called when the pipeline exits
-    def on_pipeline_exit(success, error_message):
+    def on_pipeline_exit(success: bool, error_message: Optional[str]) -> None:
         if success:
             logger.info("Pipeline exited successfully")
         else:

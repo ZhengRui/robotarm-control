@@ -1,6 +1,8 @@
 import time
+from typing import Any, Dict
 
 import imagezmq
+import numpy as np
 
 from ..utils.factory import decode
 from ..utils.logger import get_logger
@@ -19,7 +21,7 @@ class DataLoaderHandler:
     for subsequent handlers to process.
     """
 
-    def __init__(self, **kwargs):
+    def __init__(self, **kwargs: Any) -> None:
         """Initialize the data loader handler.
 
         Creates a connection to the imagezmq hub for receiving frames.
@@ -30,7 +32,7 @@ class DataLoaderHandler:
         self.hub = imagezmq.ImageHub()
         logger.info("DataLoaderHandler initialized with imagezmq hub")
 
-    def process(self, retry_delay=1.0, log_interval=100, **kwargs):
+    def process(self, retry_delay: float = 1.0, log_interval: int = 100, **kwargs: Any) -> Dict[str, np.ndarray]:
         """Process a single data loading step.
 
         Receives a frame from the imagezmq hub and returns it.
@@ -62,6 +64,8 @@ class DataLoaderHandler:
                 logger.warning(f"Communication Error {err}!")
                 time.sleep(retry_delay)
                 continue
+
+        assert frame is not None
 
         if i_frame % log_interval == 0:
             logger.info(f"{rpi_name} {i_frame}th frame: {frame.shape}")

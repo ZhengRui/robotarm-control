@@ -266,4 +266,3 @@ class BasePipeline(ABC):
         pipeline's processing logic based on its current state.
         """
         pass
-        pass

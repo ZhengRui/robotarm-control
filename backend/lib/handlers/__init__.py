@@ -1,5 +1,6 @@
-from typing import Any, Dict
+from typing import Any, Dict, Union
 
+from .armcontrol import ArmControlHandler
 from .calibrate import CalibrateHandler
 from .dataloader import DataLoaderHandler
 from .detect import DetectHandler
@@ -9,7 +10,9 @@ class HandlerFactory:
     """Factory for creating handler instances."""
 
     @staticmethod
-    def create_handler(handler_type: str, config: Dict[str, Any]):
+    def create_handler(
+        handler_type: str, config: Dict[str, Any]
+    ) -> Union[CalibrateHandler, DetectHandler, ArmControlHandler, DataLoaderHandler]:
         """Create a handler instance based on type and config.
 
         Args:
@@ -27,8 +30,6 @@ class HandlerFactory:
         elif handler_type == "detect":
             return DetectHandler(**config)
         elif handler_type == "armcontrol":
-            from .armcontrol import ArmControlHandler
-
             return ArmControlHandler(**config)
         elif handler_type == "dataloader":
             return DataLoaderHandler(**config)

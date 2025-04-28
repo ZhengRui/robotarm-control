@@ -13,7 +13,7 @@ from lib.utils.logger import get_logger
 logger = get_logger("streaming")
 
 
-def stream(args):
+def stream(args: argparse.Namespace) -> None:
     source, server = args.source, args.server
     max_size, keep_size = args.max_size, args.keep_size
     lossy, jpg_quality = args.lossy, args.jpg_quality
@@ -26,7 +26,7 @@ def stream(args):
     client = imagezmq.ImageSender(connect_to=f"tcp://{server}:5555")
     rpi_name = socket.gethostname()
 
-    fps, i_frame, d_frame = 0, 0, 10
+    fps, i_frame, d_frame = 0.0, 0, 10
     t0 = time.time()
     t_wait = 0 if (factory.type == "image" and not autoplay) else 10
     cv2.namedWindow("Demo", cv2.WINDOW_GUI_NORMAL)
@@ -52,7 +52,7 @@ def stream(args):
         _, im = decode(msg)
         h, w = im.shape[:2]
 
-        if display_file_name:
+        if display_file_name and isinstance(factory.source, list):
             sourcePath = factory.source[i_frame - 1]
             fileName = sourcePath.split(source)
 
@@ -67,7 +67,7 @@ def stream(args):
         )
 
         if write_to:
-            if factory.type == "image":
+            if factory.type == "image" and isinstance(factory.source, list):
                 savename = os.path.basename(factory.source[i_frame - 1])
             else:
                 savename = f"{i_frame - 1:04d}.jpg"

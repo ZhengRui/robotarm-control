@@ -1,3 +1,5 @@
+from typing import Any, Dict, Optional, Tuple
+
 import cv2
 import numpy as np
 
@@ -7,20 +9,20 @@ logger = get_logger("calibrate")
 
 
 class CalibrateHandler:
-    def __init__(self, name="yahboom", **kwargs):
+    def __init__(self, name: str = "yahboom", **kwargs: Any) -> None:
         if name == "yahboom":
             self.handler = YahboomCalibrateHandler()
 
-    def process(self, frame, debug=False, **kwargs):
+    def process(self, frame: np.ndarray, debug: bool = False, **kwargs: Any) -> Dict[str, Optional[np.ndarray]]:
         return self.handler.process(frame, debug=debug, **kwargs)
 
 
 class YahboomCalibrateHandler:
-    def __init__(self, binary_threshold=140):
-        self.wnd_size = None
+    def __init__(self, binary_threshold: int = 140) -> None:
+        self.wnd_size: Optional[Tuple[int, int]] = None
         self.binary_threshold = binary_threshold
 
-    def process(self, frame, debug=False):
+    def process(self, frame: np.ndarray, debug: bool = False) -> Dict[str, Optional[np.ndarray]]:
         h, w = frame.shape[:2]
 
         if debug and (not self.wnd_size or self.wnd_size != (h, w)):
@@ -46,6 +48,7 @@ class YahboomCalibrateHandler:
         im_area = h * w
         perspective_img = np.zeros((h, w, 3), dtype=np.uint8)
         succeed = False
+        matrix: Optional[np.ndarray] = None
 
         for contour in contours:
             contour_area = cv2.contourArea(contour)
@@ -62,30 +65,32 @@ class YahboomCalibrateHandler:
                     s = dp.sum(axis=1)
                     diff = np.diff(dp, axis=1)
 
-                    src_pts = np.float32(
+                    src_pts = np.array(
                         [
                             dp[np.argmin(s)],  # Top-left point has smallest sum
                             dp[np.argmin(diff)],  # Top-right point has smallest difference
                             dp[np.argmax(s)],  # Bottom-right point has largest sum
                             dp[np.argmax(diff)],  # Bottom-left point has largest difference
-                        ]
+                        ],
+                        dtype=np.float32,
                     )
 
-                    dst_pts = np.float32(
+                    dst_pts = np.array(
                         [
                             [0, 0],  # Top-left
                             [w - 1, 0],  # Top-right
                             [w - 1, h - 1],  # Bottom-right
                             [0, h - 1],  # Bottom-left
-                        ]
+                        ],
+                        dtype=np.float32,
                     )
 
-                    matrix = cv2.getPerspectiveTransform(src_pts, dst_pts)
+                    matrix = cv2.getPerspectiveTransform(src_pts, dst_pts)  # type: ignore
                     succeed = True
                     break
 
         if debug:
-            if succeed:
+            if succeed and matrix is not None:
                 perspective_img = cv2.warpPerspective(frame, matrix, (w, h))
 
             cv2.imshow("Calibrate", im)
