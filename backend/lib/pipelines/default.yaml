@@ -18,7 +18,7 @@ yahboom_pick_and_place:
         green: [[35, 43, 46], [77, 255, 255]]
         blue: [[100, 43, 46], [124, 255, 255]]
         yellow: [[26, 43, 46], [34, 255, 255]]
-      color_mapping_configs:
+      coord_mapping_configs:
         pixels_per_meter: [4200, 4000]
         rotation_matrix: [[0, -1], [-1, 0]]
         offset: [0.27, 0.0762]
