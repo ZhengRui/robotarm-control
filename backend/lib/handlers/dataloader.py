@@ -62,7 +62,7 @@ class DataLoaderHandler:
                 assert frame.size
                 frame_received = True
             except Exception as err:
-                logger.warning(f"Communication Error {err}!")
+                logger.warning(f"Communication Error {err}!", exc_info=True)
                 time.sleep(retry_delay)
                 continue
 
@@ -72,6 +72,6 @@ class DataLoaderHandler:
             logger.info(f"{rpi_name} {i_frame}th frame: {frame.shape}")
 
         # Send reply to acknowledge receipt
-        self.hub.send_reply(json.dumps({"status": "OK"}).encode('utf-8'))
+        self.hub.send_reply(json.dumps({"status": "OK"}).encode("utf-8"))
 
         return {"frame": frame}

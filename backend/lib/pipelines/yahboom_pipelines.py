@@ -149,8 +149,8 @@ class YahboomPickAndPlacePipeline(BasePipeline):
         elif self.state == PipelineState.DETECTING:
             self._process_detection()
 
-        elif self.state == PipelineState.PICKING_PLACING:
-            self._process_pick_and_place()
+        # elif self.state == PipelineState.PICKING_PLACING:
+        #     self._process_pick_and_place()
 
     def _get_latest_frame(self) -> None:
         """Get the latest frame from the dataloader handler.

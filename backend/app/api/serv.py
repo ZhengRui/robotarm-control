@@ -1,13 +1,14 @@
 import os
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import List, Optional
 
 import yaml
-from fastapi import Body, FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel
+
 from lib.pipelines import PipelineFactory
 from lib.pipelines.base import SignalPriority
 from lib.utils.logger import get_logger
-from pydantic import BaseModel
 
 # Initialize logger
 logger = get_logger("api")
@@ -47,7 +48,7 @@ def get_available_pipelines() -> List[str]:
             config = yaml.safe_load(f) or {}
             return list(config.keys())
     except (yaml.YAMLError, IOError) as e:
-        logger.error(f"Failed to load pipeline configuration: {e}")
+        logger.error(f"Failed to load pipeline configuration: {e}", exc_info=True)
         return []
 
 
@@ -62,8 +63,8 @@ async def send_signal(request: SignalRequest):
         logger.info(f"Signal '{request.signal}' sent to pipeline with priority {request.priority.name}")
         return {"status": "success", "message": f"Signal '{request.signal}' sent successfully"}
     except Exception as e:
-        logger.error(f"Error sending signal: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to send signal: {str(e)}")
+        logger.error(f"Error sending signal: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to send signal: {e!s}")
 
 
 @app.get("/status", status_code=200)
@@ -76,7 +77,7 @@ async def get_status():
     status = {
         "pipeline": pipeline_instance.pipeline_name,
         "running": pipeline_instance.running,
-        "state": pipeline_instance.current_state
+        "state": pipeline_instance.current_state,
     }
 
     return status
@@ -92,7 +93,7 @@ async def get_info():
         "pipeline": pipeline_instance.pipeline_name,
         "signals": pipeline_instance.available_signals,
         "states": pipeline_instance.available_states,
-        "current_state": pipeline_instance.current_state
+        "current_state": pipeline_instance.current_state,
     }
 
 
@@ -103,7 +104,7 @@ async def list_pipelines():
 
     return {
         "available_pipelines": pipelines,
-        "current_pipeline": pipeline_instance.pipeline_name if pipeline_instance else None
+        "current_pipeline": pipeline_instance.pipeline_name if pipeline_instance else None,
     }
 
 
@@ -120,15 +121,13 @@ def _create_and_start_pipeline(pipeline_name: str, debug: bool = False) -> None:
     global pipeline_instance
 
     logger.info(f"Initializing pipeline: {pipeline_name} (debug={debug})")
-    pipeline_instance = PipelineFactory.create_pipeline(
-        pipeline_name, debug=debug
-    )
+    pipeline_instance = PipelineFactory.create_pipeline(pipeline_name, debug=debug)
 
     def on_pipeline_exit(success: bool, error_message: Optional[str] = None):
         if success:
             logger.info("Pipeline exited successfully")
         else:
-            logger.error(f"Pipeline exited with error: {error_message}")
+            logger.error(f"Pipeline exited with error: {error_message}", exc_info=True)
 
     pipeline_instance.set_exit_callback(on_pipeline_exit)
     logger.info(f"Pipeline '{pipeline_name}' started successfully")
@@ -148,14 +147,11 @@ async def start_pipeline(request: PipelineRequest):
         return {
             "status": "success",
             "pipeline": request.pipeline_name,
-            "message": f"Pipeline '{request.pipeline_name}' started successfully"
+            "message": f"Pipeline '{request.pipeline_name}' started successfully",
         }
     except Exception as e:
-        logger.error(f"Failed to start pipeline: {e}")
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to start pipeline '{request.pipeline_name}': {str(e)}"
-        )
+        logger.error(f"Failed to start pipeline: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to start pipeline '{request.pipeline_name}': {e!s}")
 
 
 def _stop_running_pipeline() -> None:
@@ -184,13 +180,10 @@ async def stop_pipeline():
     try:
         pipeline_name = pipeline_instance.pipeline_name
         _stop_running_pipeline()
-        return {
-            "status": "success",
-            "message": f"Pipeline '{pipeline_name}' stopped successfully"
-        }
+        return {"status": "success", "message": f"Pipeline '{pipeline_name}' stopped successfully"}
     except Exception as e:
-        logger.error(f"Error stopping pipeline: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to stop pipeline: {str(e)}")
+        logger.error(f"Error stopping pipeline: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to stop pipeline: {e!s}")
 
 
 # No automatic pipeline startup on application start
@@ -203,7 +196,7 @@ async def startup_event():
         try:
             _create_and_start_pipeline(initial_pipeline, initial_debug)
         except Exception as e:
-            logger.error(f"Failed to start pipeline on startup: {e}")
+            logger.error(f"Failed to start pipeline on startup: {e}", exc_info=True)
 
 
 # Cleanup on shutdown

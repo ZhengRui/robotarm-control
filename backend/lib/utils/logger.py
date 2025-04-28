@@ -1,8 +1,8 @@
+import atexit
 import logging
 import logging.handlers
 import queue
 import sys
-import threading
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -11,7 +11,7 @@ from typing import Any
 BACKEND_ROOT = Path(__file__).resolve().parent.parent.parent
 
 # Create a queue for thread-safe logging
-log_queue = queue.Queue(-1)  # -1 means unlimited size
+log_queue: queue.Queue = queue.Queue(-1)  # -1 means unlimited size
 queue_handler = logging.handlers.QueueHandler(log_queue)
 
 # Create console handler
@@ -106,8 +106,6 @@ def critical(msg: Any, *args: Any, **kwargs: Any) -> None:
 
 
 # Stop the listener when the program exits
-import atexit
-
 atexit.register(listener.stop)
 
 

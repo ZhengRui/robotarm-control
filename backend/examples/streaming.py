@@ -6,6 +6,7 @@ import time
 
 import cv2
 import imagezmq
+
 from lib.utils.factory import Factory, decode
 from lib.utils.logger import get_logger
 

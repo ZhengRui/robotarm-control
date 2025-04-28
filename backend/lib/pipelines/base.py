@@ -21,6 +21,7 @@ cfg_merger = Merger([(list, ["override"]), (dict, ["merge"])], ["override"], ["o
 
 class SignalPriority(Enum):
     """Priority levels for pipeline signals."""
+
     HIGH = auto()  # Must be processed immediately
     NORMAL = auto()  # Can be processed in next cycle
 
@@ -30,14 +31,9 @@ class BasePipeline(ABC):
 
     This class provides a framework for pipeline execution with the following features:
     - Configuration loading and handler initialization
-    - Threading infrastructure for non-blocking execution
+    - Two separate threads: one for signal handling, one for step execution
     - Priority-based signal queue for user interaction
-    - Main execution loop with frame processing
     - Callback mechanism for pipeline state changes
-
-    Subclasses must implement:
-    - handle_signal(): Process user signals/commands
-    - step(): Process a single step in the current pipeline state
     """
 
     def __init__(self, pipeline_name: str, config_override: Optional[Dict[str, Any]] = None, debug: bool = False):
@@ -73,17 +69,15 @@ class BasePipeline(ABC):
         logger.info(f"Pipeline '{pipeline_name}' initialized handlers: {', '.join(self.handlers.keys())}")
 
         self.running = False
-        self.thread: Optional[threading.Thread] = None
         self.on_exit_callback: Optional[Callable[[bool, Optional[str]], None]] = None
 
         # Create priority queue for signals
         self.signal_queue: queue.PriorityQueue[Tuple[int, str]] = queue.PriorityQueue()
 
-        # Thread management for step execution
+        # Thread management
+        self._signal_thread: Optional[threading.Thread] = None
         self._step_thread: Optional[threading.Thread] = None
-        self._step_complete = threading.Event()
-        self._step_complete.set()
-        self._step_error: Optional[Exception] = None
+        self._stop_event = threading.Event()
 
         try:
             self.start()
@@ -230,101 +224,121 @@ class BasePipeline(ABC):
         logger.debug(f"Pipeline '{self.pipeline_name}' exit callback set")
 
     def start(self) -> None:
-        """Start the pipeline in a separate thread."""
-        if self.thread is not None and self.thread.is_alive():
+        """Start the pipeline with two separate threads for signal handling and step execution."""
+        if self._signal_thread is not None and self._signal_thread.is_alive():
             logger.warning(f"Pipeline '{self.pipeline_name}' already running")
             return
 
         self.running = True
-        self.thread = threading.Thread(target=self.serve)
-        self.thread.daemon = True
-        self.thread.start()
-        logger.info(f"Pipeline '{self.pipeline_name}' started in background thread")
+        self._stop_event.clear()
 
-    def serve(self) -> Any:
-        """Serve the pipeline workflow.
+        # Start signal handling thread
+        self._signal_thread = threading.Thread(target=self._signal_loop)
+        self._signal_thread.daemon = True
+        self._signal_thread.start()
 
-        This method runs in a separate thread and forms the main execution
-        loop of the pipeline, checking for signals and processing frames.
-        If an exit callback is set, it will be called when the pipeline exits,
-        either normally or due to an exception.
+        # Start step execution thread
+        self._step_thread = threading.Thread(target=self._step_loop)
+        self._step_thread.daemon = True
+        self._step_thread.start()
 
-        Returns:
-            Pipeline result (implementation-dependent)
+        logger.info(f"Pipeline '{self.pipeline_name}' started with separate signal and step threads")
+
+    def _signal_loop(self) -> None:
+        """Run the signal handling loop.
+
+        This method continuously checks for signals and processes them
+        until the pipeline is stopped.
         """
         success = False
         error_message = None
 
         try:
-            while self.running:
+            while self.running and not self._stop_event.is_set():
                 # Check for signals
                 signal = self._get_pending_signal()
                 if signal is not None:
                     self.handle_signal(signal)
 
-                # Check if current step is complete
-                if self._step_complete.is_set():
-                    # Handle step completion
-                    if self._step_error:
-                        error_message = f"Step failed: {self._step_error}"
-                        logger.error(error_message)
-
-                        # keep running the pipeline
-                        # self.running = False
-                        # break
-
-                    # Clean up and start next step
-                    self._step_thread = None
-                    self._step_error = None
-                    self._step_complete.clear()
-
-                    # Start next step
-                    self._step_thread = threading.Thread(target=self._run_step)
-                    self._step_thread.start()
-
                 # Small sleep to prevent busy waiting
                 time.sleep(0.1)
 
-            # If we reached here, the pipeline exited normally
+            # If we reached here, the signal thread exited normally
             success = True
         except Exception as e:
-            # Capture any exceptions that occurred during pipeline execution
-            error_message = f"Pipeline '{self.pipeline_name}' encountered an error: {e!s}"
-            # Log the error only if no callback is set (to avoid redundant logging)
-            if not self.on_exit_callback:
-                logger.error(error_message, exc_info=True)
+            # Capture any exceptions that occurred during signal handling
+            error_message = f"Pipeline '{self.pipeline_name}' signal thread encountered an error: {e!s}"
+            logger.error(error_message, exc_info=True)
             self.running = False
+            self._stop_event.set()
         finally:
-            # Notify that the pipeline has exited, whether normally or due to an error
-            if self.on_exit_callback:
-                try:
-                    self.on_exit_callback(success, error_message)
-                except Exception as callback_error:
-                    # Don't let callback errors propagate
-                    logger.error(f"Error in pipeline exit callback: {callback_error}", exc_info=True)
+            # Notify that the pipeline has exited if this is the last thread to exit
+            if not self._step_thread or not self._step_thread.is_alive():
+                self._notify_exit(success, error_message)
 
-            logger.info(f"Pipeline '{self.pipeline_name}' thread exiting")
+            logger.info(f"Pipeline '{self.pipeline_name}' signal thread exiting")
 
-    def _run_step(self) -> None:
-        """Run a single step in a separate thread.
+    def _step_loop(self) -> None:
+        """Run the step execution loop.
 
-        This method wraps the step() method to handle exceptions and
-        signal step completion.
+        This method continuously executes pipeline steps until the pipeline is stopped,
+        handling any exceptions that occur during step execution.
         """
+        success = False
+        error_message = None
+
         try:
-            self.step()
+            while self.running and not self._stop_event.is_set():
+                try:
+                    self.step()
+                except Exception as e:
+                    logger.error(f"Error in pipeline step: {e}", exc_info=True)
+                    # Continue running despite errors
+
+                # Small sleep to prevent busy waiting
+                time.sleep(0.01)
+
+            # If we reached here, the step thread exited normally
+            success = True
         except Exception as e:
-            self._step_error = e
+            # Capture any exceptions that occurred during step execution
+            error_message = f"Pipeline '{self.pipeline_name}' step thread encountered an error: {e!s}"
+            logger.error(error_message, exc_info=True)
+            self.running = False
+            self._stop_event.set()
         finally:
-            self._step_complete.set()
+            # Notify that the pipeline has exited if this is the last thread to exit
+            if not self._signal_thread or not self._signal_thread.is_alive():
+                self._notify_exit(success, error_message)
+
+            logger.info(f"Pipeline '{self.pipeline_name}' step thread exiting")
+
+    def _notify_exit(self, success: bool, error_message: Optional[str]) -> None:
+        """Notify the exit callback that the pipeline has exited.
+
+        Args:
+            success: Whether the pipeline exited successfully
+            error_message: Error message if the pipeline exited with an error
+        """
+        if self.on_exit_callback:
+            try:
+                self.on_exit_callback(success, error_message)
+            except Exception as callback_error:
+                # Don't let callback errors propagate
+                logger.error(f"Error in pipeline exit callback: {callback_error}", exc_info=True)
 
     def stop(self) -> None:
-        """Stop the pipeline."""
+        """Stop the pipeline and wait for threads to exit."""
         self.running = False
+        self._stop_event.set()
+
+        # Wait for threads to exit
+        if self._signal_thread:
+            self._signal_thread.join(timeout=1.0)
+
         if self._step_thread:
             self._step_thread.join(timeout=1.0)
-        if self.thread:
-            self.thread.join(timeout=1.0)
+
         logger.info(f"Pipeline '{self.pipeline_name}' stopped")
 
     @abstractmethod
