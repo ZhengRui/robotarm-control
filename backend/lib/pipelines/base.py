@@ -1,8 +1,10 @@
 import os
 import queue
 import threading
+import time
 from abc import ABC, abstractmethod
-from typing import Any, Callable, Dict, List, Optional
+from enum import Enum, auto
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 import yaml
 from deepmerge import Merger
@@ -17,13 +19,19 @@ logger = get_logger("pipeline")
 cfg_merger = Merger([(list, ["override"]), (dict, ["merge"])], ["override"], ["override"])
 
 
+class SignalPriority(Enum):
+    """Priority levels for pipeline signals."""
+    HIGH = auto()  # Must be processed immediately
+    NORMAL = auto()  # Can be processed in next cycle
+
+
 class BasePipeline(ABC):
     """Base class for all pipelines.
 
     This class provides a framework for pipeline execution with the following features:
     - Configuration loading and handler initialization
     - Threading infrastructure for non-blocking execution
-    - Signal queue for user interaction and state management
+    - Priority-based signal queue for user interaction
     - Main execution loop with frame processing
     - Callback mechanism for pipeline state changes
 
@@ -68,8 +76,14 @@ class BasePipeline(ABC):
         self.thread: Optional[threading.Thread] = None
         self.on_exit_callback: Optional[Callable[[bool, Optional[str]], None]] = None
 
-        # Create signal queue for user interactions
-        self.signal_queue: queue.Queue[str] = queue.Queue()
+        # Create priority queue for signals
+        self.signal_queue: queue.PriorityQueue[Tuple[int, str]] = queue.PriorityQueue()
+
+        # Thread management for step execution
+        self._step_thread: Optional[threading.Thread] = None
+        self._step_complete = threading.Event()
+        self._step_complete.set()
+        self._step_error: Optional[Exception] = None
 
         try:
             self.start()
@@ -178,14 +192,16 @@ class BasePipeline(ABC):
 
         return handlers
 
-    def signal(self, signal: str) -> None:
-        """Send a signal to the pipeline.
+    def signal(self, signal: str, priority: SignalPriority = SignalPriority.NORMAL) -> None:
+        """Send a signal to the pipeline with specified priority.
 
         Args:
             signal: The signal to send
+            priority: Priority level of the signal (default: NORMAL)
         """
-        logger.info(f"Pipeline '{self.pipeline_name}' received signal: {signal}")
-        self.signal_queue.put(signal)
+        logger.info(f"Pipeline '{self.pipeline_name}' received signal: {signal} (priority: {priority.name})")
+        # Use priority value as the first element of the tuple for queue ordering
+        self.signal_queue.put((priority.value, signal))
 
     def _get_pending_signal(self) -> Optional[str]:
         """Check for pending signals without blocking.
@@ -194,7 +210,9 @@ class BasePipeline(ABC):
             Signal if available, None otherwise
         """
         try:
-            return self.signal_queue.get_nowait()
+            # Get the signal from the priority queue
+            _, signal = self.signal_queue.get_nowait()
+            return signal
         except queue.Empty:
             return None
 
@@ -223,13 +241,6 @@ class BasePipeline(ABC):
         self.thread.start()
         logger.info(f"Pipeline '{self.pipeline_name}' started in background thread")
 
-    def stop(self) -> None:
-        """Stop the pipeline."""
-        self.running = False
-        if self.thread:
-            self.thread.join(timeout=1.0)
-        logger.info(f"Pipeline '{self.pipeline_name}' stopped")
-
     def serve(self) -> Any:
         """Serve the pipeline workflow.
 
@@ -246,12 +257,33 @@ class BasePipeline(ABC):
 
         try:
             while self.running:
+                # Check for signals
                 signal = self._get_pending_signal()
-
                 if signal is not None:
                     self.handle_signal(signal)
 
-                self.step()
+                # Check if current step is complete
+                if self._step_complete.is_set():
+                    # Handle step completion
+                    if self._step_error:
+                        error_message = f"Step failed: {self._step_error}"
+                        logger.error(error_message)
+
+                        # keep running the pipeline
+                        # self.running = False
+                        # break
+
+                    # Clean up and start next step
+                    self._step_thread = None
+                    self._step_error = None
+                    self._step_complete.clear()
+
+                    # Start next step
+                    self._step_thread = threading.Thread(target=self._run_step)
+                    self._step_thread.start()
+
+                # Small sleep to prevent busy waiting
+                time.sleep(0.1)
 
             # If we reached here, the pipeline exited normally
             success = True
@@ -272,6 +304,28 @@ class BasePipeline(ABC):
                     logger.error(f"Error in pipeline exit callback: {callback_error}", exc_info=True)
 
             logger.info(f"Pipeline '{self.pipeline_name}' thread exiting")
+
+    def _run_step(self) -> None:
+        """Run a single step in a separate thread.
+
+        This method wraps the step() method to handle exceptions and
+        signal step completion.
+        """
+        try:
+            self.step()
+        except Exception as e:
+            self._step_error = e
+        finally:
+            self._step_complete.set()
+
+    def stop(self) -> None:
+        """Stop the pipeline."""
+        self.running = False
+        if self._step_thread:
+            self._step_thread.join(timeout=1.0)
+        if self.thread:
+            self.thread.join(timeout=1.0)
+        logger.info(f"Pipeline '{self.pipeline_name}' stopped")
 
     @abstractmethod
     def handle_signal(self, signal: str) -> None:

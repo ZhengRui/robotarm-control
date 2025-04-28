@@ -1,11 +1,29 @@
 import logging
+import queue
 import sys
+import threading
 from datetime import datetime
 from pathlib import Path
 from typing import Any
 
 # Determine the backend directory (2 levels up from the utils directory)
 BACKEND_ROOT = Path(__file__).resolve().parent.parent.parent
+
+# Create a queue for thread-safe logging
+log_queue = queue.Queue(-1)  # -1 means unlimited size
+queue_handler = logging.handlers.QueueHandler(log_queue)
+
+# Create console handler
+console_handler = logging.StreamHandler(sys.stdout)
+formatter = logging.Formatter(
+    "%(asctime)s, %(levelname)-8s [%(filename)s:%(funcName)s:%(lineno)d] %(message)s",
+    datefmt="%Y-%m-%d:%H:%M:%S",
+)
+console_handler.setFormatter(formatter)
+
+# Start the listener thread
+listener = logging.handlers.QueueListener(log_queue, console_handler)
+listener.start()
 
 
 def get_logger(
@@ -36,16 +54,8 @@ def get_logger(
     # Disable propagation to parent loggers to prevent duplicate logs
     logger.propagate = False
 
-    # Create formatter
-    formatter = logging.Formatter(
-        "%(asctime)s, %(levelname)-8s [%(filename)s:%(funcName)s:%(lineno)d] %(message)s",
-        datefmt="%Y-%m-%d:%H:%M:%S",
-    )
-
-    # Create console handler
-    console_handler = logging.StreamHandler(sys.stdout)
-    console_handler.setFormatter(formatter)
-    logger.addHandler(console_handler)
+    # Add queue handler for thread-safe logging
+    logger.addHandler(queue_handler)
 
     # Add file handler if requested
     if log_to_file:
@@ -92,6 +102,12 @@ def error(msg: Any, *args: Any, **kwargs: Any) -> None:
 
 def critical(msg: Any, *args: Any, **kwargs: Any) -> None:
     default_logger.critical(msg, *args, **kwargs)
+
+
+# Stop the listener when the program exits
+import atexit
+
+atexit.register(listener.stop)
 
 
 # Usage examples:

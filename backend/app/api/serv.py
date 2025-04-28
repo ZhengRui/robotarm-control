@@ -5,6 +5,7 @@ from typing import Any, Dict, List, Optional
 import yaml
 from fastapi import Body, FastAPI, HTTPException
 from lib.pipelines import PipelineFactory
+from lib.pipelines.base import SignalPriority
 from lib.utils.logger import get_logger
 from pydantic import BaseModel
 
@@ -25,6 +26,7 @@ initial_debug = os.environ.get("DEBUG", "").lower() == "true"
 # Define request models
 class SignalRequest(BaseModel):
     signal: str
+    priority: SignalPriority = SignalPriority.NORMAL
 
 
 class PipelineRequest(BaseModel):
@@ -56,8 +58,8 @@ async def send_signal(request: SignalRequest):
         raise HTTPException(status_code=500, detail="No pipeline is running")
 
     try:
-        pipeline_instance.signal(request.signal)
-        logger.info(f"Signal '{request.signal}' sent to pipeline")
+        pipeline_instance.signal(request.signal, priority=request.priority)
+        logger.info(f"Signal '{request.signal}' sent to pipeline with priority {request.priority.name}")
         return {"status": "success", "message": f"Signal '{request.signal}' sent successfully"}
     except Exception as e:
         logger.error(f"Error sending signal: {e}")
@@ -167,7 +169,7 @@ def _stop_running_pipeline() -> None:
         return
 
     logger.info("Stopping pipeline")
-    pipeline_instance.signal("stop")
+    pipeline_instance.signal("stop", priority=SignalPriority.HIGH)
     pipeline_instance.stop()
     pipeline_instance = None
     logger.info("Pipeline stopped, time to clear stop event")
