@@ -44,10 +44,16 @@ class YahboomPickAndPlacePipeline(BasePipeline):
     - "stop": Stop the pipeline
     """
 
-    def __init__(self, config_override: Optional[Dict[str, Any]] = None, debug: bool = False):
+    def __init__(
+        self,
+        pipeline_name: str = "yahboom_pick_and_place",
+        config_override: Optional[Dict[str, Any]] = None,
+        debug: bool = False,
+    ):
         """Initialize the yahboom pick and place pipeline.
 
         Args:
+            pipeline_name: Name of the pipeline (used to load configuration)
             config_override: Optional configuration overrides
             debug: Whether to enable debug mode for visualization
         """
@@ -67,7 +73,7 @@ class YahboomPickAndPlacePipeline(BasePipeline):
         self.pt_matrix: Optional[np.ndarray] = None
 
         # Call parent constructor - this will start the pipeline thread
-        super().__init__(pipeline_name="yahboom_pick_and_place", config_override=config_override, debug=debug)
+        super().__init__(pipeline_name=pipeline_name, config_override=config_override, debug=debug)
 
     @property
     def available_signals(self) -> List[str]:
@@ -115,7 +121,6 @@ class YahboomPickAndPlacePipeline(BasePipeline):
         elif signal == PipelineSignal.STOP.value:
             logger.info("Stopping pipeline due to stop signal")
             self.state = PipelineState.STOPPED
-            self.running = False
 
     def step(self) -> None:
         """Process a single step based on the current state.
