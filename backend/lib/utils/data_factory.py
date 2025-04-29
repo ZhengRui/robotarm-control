@@ -25,7 +25,7 @@ def sorted_alphanumeric(data: List[str]) -> List[str]:
     return sorted(data, key=alphanum_key)
 
 
-class Factory:
+class DataFactory:
     def __init__(self, source: str):
         try:
             if source.startswith(("http://", "https://")):

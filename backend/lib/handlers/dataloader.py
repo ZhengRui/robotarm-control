@@ -5,7 +5,7 @@ from typing import Any, Dict
 import imagezmq
 import numpy as np
 
-from ..utils.factory import decode
+from ..utils.data_factory import decode
 from ..utils.logger import get_logger
 
 logger = get_logger("dataloader")

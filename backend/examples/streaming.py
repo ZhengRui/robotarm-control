@@ -7,7 +7,7 @@ import time
 import cv2
 import imagezmq
 
-from lib.utils.factory import Factory, decode
+from lib.utils.data_factory import DataFactory, decode
 from lib.utils.logger import get_logger
 
 logger = get_logger("streaming")
@@ -22,7 +22,7 @@ def stream(args: argparse.Namespace) -> None:
     if write_to:
         assert os.path.exists(write_to)
 
-    factory = Factory(source)
+    factory = DataFactory(source)
     client = imagezmq.ImageSender(connect_to=f"tcp://{server}:5555")
     rpi_name = socket.gethostname()
 
