@@ -6,8 +6,9 @@
 
 - **物体检测**：基于颜色的物体检测和跟踪
 - **机器人控制**：控制亚博 MyCobot 280 机器人手臂
-- **客户端-服务器架构**：图像处理服务器与客户端摄像头分离
-- **模块化设计**：可替换不同的处理器用于检测、校准和控制
+- **管道架构**：模块化管道系统，具有基于优先级的信号处理
+- **FastAPI 集成**：用于控制管道和发送信号的现代 Web API
+- **进程管理**：可靠管道执行的多进程架构
 - **可配置性**：适应不同的机器人设置、检测参数和任务
 
 ## 安装
@@ -40,66 +41,62 @@
 ### 机器人手臂设置
 
 1. 通过 USB 将亚博 MyCobot 280 连接到您的计算机
-2. 默认端口设置为 `/dev/ttyUSB0`。如果您的机器人连接到不同的端口，您需要在运行处理器时指定它。
+2. 默认端口设置为 `/dev/ttyUSB0`。如果您的机器人连接到不同的端口，您需要在配置中指定它。
 
 ## 使用方法
 
 ### 启动服务器
 
-使用特定处理器运行服务器：
+使用特定管道运行服务器：
 
 ```bash
-python server.py --handler detect
+python -m backend.main --pipeline yahboom_pick_and_place
 ```
 
-可用的处理器：
-- `detect`：仅用于物体检测
-- `calibrate`：用于校准摄像头到机器人坐标系统
-- `armcontrol`：用于带有物体检测的机器人手臂控制
-
-使用 `--debug` 标志启用可视化：
+或通过环境变量设置初始管道：
 
 ```bash
-python server.py --handler detect --debug
+PIPELINE=yahboom_pick_and_place DEBUG=true python -m backend.main
 ```
 
-### 运行客户端
+### API 端点
 
-客户端将图像流传输到服务器进行处理：
+系统提供以下 API 端点：
 
+- `GET /pipelines`：列出所有可用和正在运行的管道
+- `POST /pipelines/start`：启动特定管道
+- `POST /pipelines/stop`：停止正在运行的管道
+- `POST /signal`：向正在运行的管道发送信号
+- `GET /status`：获取管道的详细状态信息
+
+### 示例请求
+
+启动管道：
 ```bash
-python -m examples/streaming.py --source webcam:0 --server 127.0.0.1
+curl -X POST "http://localhost:8000/pipelines/start" -H "Content-Type: application/json" -d '{"pipeline_name": "yahboom_pick_and_place", "debug": true}'
 ```
 
-`--source` 的选项：
-- `webcam:0`、`webcam:1` 等：用于网络摄像头设备
-- 视频文件路径：用于从录制的视频流传输
-- 图像或图像目录的路径：用于处理静态图像
-
-其他选项：
-- `--max_size`：图像较长边的最大尺寸（默认：800）
-- `--keep_size`：保持原始图像尺寸
-- `--jpg_quality`：JPEG 压缩质量（1-100）
-- `--lossless`：发送不压缩的原始帧
-- `--autoplay`：自动浏览图像源
-- `--enable_freeze`：使用空格键暂停
-- `--write_to`：保存处理图像的目录
+发送信号：
+```bash
+curl -X POST "http://localhost:8000/signal?pipeline_name=yahboom_pick_and_place" -H "Content-Type: application/json" -d '{"signal": "pick_red", "priority": "HIGH"}'
+```
 
 ## 项目结构
 
-- `server.py`：主服务器实现
-- `handlers/`：针对不同任务的专门模块
-  - `detect.py`：物体检测处理器
-  - `armcontrol.py`：机器人手臂控制处理器
-  - `calibrate.py`：校准处理器
+- `backend/`：主服务器实现
+  - `app/`：FastAPI 应用程序和端点
+  - `lib/`：核心功能
+    - `pipelines/`：基于进程架构的管道实现
+    - `handlers/`：用于视觉和机器人控制的专门处理器
 - `examples/`：客户端演示代码
-- `utils/`：辅助工具
 - `docs/`：文档文件
-  - `status.md`：详细状态报告
-  - `pymycobot_api_docs.md`：机器人 API 文档
 
-## 自定义处理器
+## 待办事项
 
-创建处理器需实现两个方法：
-- `process(frame)`：处理输入帧
-- `visualize(frame, result)`：可视化结果
+- **Redis 集成**：用基于 Redis 的图像流替换阻塞的 imagezmq
+- **Web 前端**：开发用于可视化处理器结果和控制管道的前端界面
+- **实时可视化**：将中间处理结果流式传输到 UI
+
+## 贡献
+
+欢迎贡献！请随时提交拉取请求。

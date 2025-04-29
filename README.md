@@ -6,8 +6,9 @@ A modular system for controlling robot arms with computer vision integration. Th
 
 - **Object Detection**: Color-based object detection and tracking
 - **Robot Control**: Control of Yahboom MyCobot 280 robot arm
-- **Client-Server Architecture**: Separate image processing server from client cameras
-- **Modular Design**: Swap out different handlers for detection, calibration, and control
+- **Pipeline Architecture**: Modular pipeline system with priority-based signal handling
+- **FastAPI Integration**: Modern web API for controlling pipelines and sending signals
+- **Process Management**: Multi-process architecture for reliable pipeline execution
 - **Configurable**: Adjust for different robot setups, detection parameters, and tasks
 
 ## Installation
@@ -40,60 +41,62 @@ A modular system for controlling robot arms with computer vision integration. Th
 ### Robot Arm Setup
 
 1. Connect the Yahboom MyCobot 280 to your computer via USB
-2. The default port is set to `/dev/ttyUSB0`. If your robot is connected to a different port, you'll need to specify it when running the handlers.
+2. The default port is set to `/dev/ttyUSB0`. If your robot is connected to a different port, you'll need to specify it in your configuration.
 
 ## Usage
 
 ### Starting the Server
 
-Run the server with a specific handler:
+Run the server with a specific pipeline:
 
 ```bash
-python server.py --handler detect
+python -m backend.main --pipeline yahboom_pick_and_place
 ```
 
-Available handlers:
-- `detect`: For object detection only
-- `calibrate`: For calibrating the camera-to-robot coordinate system
-- `armcontrol`: For robot arm control with object detection
-
-Use the `--debug` flag to enable visualization:
+Or set the initial pipeline through environment variables:
 
 ```bash
-python server.py --handler detect --debug
+PIPELINE=yahboom_pick_and_place DEBUG=true python -m backend.main
 ```
 
-### Running the Client
+### API Endpoints
 
-The client streams images to the server for processing:
+The system exposes the following API endpoints:
 
+- `GET /pipelines`: List all available and running pipelines
+- `POST /pipelines/start`: Start a specific pipeline
+- `POST /pipelines/stop`: Stop a running pipeline
+- `POST /signal`: Send a signal to a running pipeline
+- `GET /status`: Get detailed status information for a pipeline
+
+### Example Request
+
+Start a pipeline:
 ```bash
-python -m examples/streaming.py --source webcam:0 --server 127.0.0.1
+curl -X POST "http://localhost:8000/pipelines/start" -H "Content-Type: application/json" -d '{"pipeline_name": "yahboom_pick_and_place", "debug": true}'
 ```
 
-Options for `--source`:
-- `webcam:0`, `webcam:1`, etc.: For webcam devices
-- Path to a video file: For streaming from a recorded video
-- Path to an image or directory of images: For processing static images
-
-Additional options:
-- `--max_size`: Maximum size of the longer side of the image (default: 800)
-- `--keep_size`: Keep original image size
-- `--jpg_quality`: JPEG compression quality (1-100)
-- `--lossless`: Send raw frames without compression
-- `--autoplay`: Automatically advance through image sources
-- `--enable_freeze`: Enable pausing with spacebar
-- `--write_to`: Directory to save processed images
+Send a signal:
+```bash
+curl -X POST "http://localhost:8000/signal?pipeline_name=yahboom_pick_and_place" -H "Content-Type: application/json" -d '{"signal": "pick_red", "priority": "HIGH"}'
+```
 
 ## Project Structure
 
-- `server.py`: Main server implementation
-- `handlers/`: Specialized modules for different tasks
-  - `detect.py`: Object detection handler
-  - `armcontrol.py`: Robot arm control handler
-  - `calibrate.py`: Calibration handler
+- `backend/`: Main server implementation
+  - `app/`: FastAPI application and endpoints
+  - `lib/`: Core functionality
+    - `pipelines/`: Pipeline implementations with process-based architecture
+    - `handlers/`: Specialized handlers for vision and robot control
 - `examples/`: Client-side demonstration code
-- `utils/`: Helper utilities
 - `docs/`: Documentation files
-  - `status.md`: Detailed status report
-  - `pymycobot_api_docs.md`: Robot API documentation
+
+## TODO
+
+- **Redis Integration**: Replace blocking imagezmq with Redis-based image streaming
+- **Web-based UI**: Develop a frontend for visualizing handler results and controlling pipelines
+- **Real-time Visualization**: Stream intermediate processing results to the UI
+
+## Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
