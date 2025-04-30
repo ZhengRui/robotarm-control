@@ -1,9 +1,14 @@
 yahboom_pick_and_place:
   dataloader:
-    name: "default"
+    name: "redis"
+    init:
+      host: "127.0.0.1"
+      port: 6379
+      db: 0
     process:
-      retry_delay: 1.0
-      log_interval: 100
+      queue: "camera_frames"
+      wait: true
+      timeout: 0.5
 
   calibrate:
     name: "yahboom"

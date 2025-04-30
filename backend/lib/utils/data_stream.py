@@ -1,3 +1,4 @@
+import base64
 import json
 import os
 import socket
@@ -128,10 +129,13 @@ class RedisDataStreamClient(DataStreamClient):
             Tuple containing (queue_length, success_status)
         """
         try:
+            # Convert binary data to Base64 for JSON compatibility
+            msg_base64_encoded = base64.b64encode(msg).decode("ascii")
+
             # Prepare message payload
             payload = {
                 "timestamp": time.time(),
-                "frame": msg,
+                "frame": msg_base64_encoded,
             }
 
             # Add metadata if provided
