@@ -14,7 +14,13 @@ def stream(args: argparse.Namespace) -> None:
         assert os.path.exists(args.write_to), f"Write directory {args.write_to} does not exist"
 
     # Configure Redis connection
-    server_config = {"addr": args.server, "port": args.redis_port, "queue": args.redis_queue}
+    server_config = {
+        "addr": args.server,
+        "port": args.redis_port,
+        "queue": args.redis_queue,
+        "max_frames": args.max_frames,
+        "time_window": args.time_window,
+    }
 
     # Create DataStream with Redis backend
     stream = DataStream(backend="redis", server_config=server_config)
@@ -49,6 +55,12 @@ if __name__ == "__main__":
     parser.add_argument("--server", type=str, default="127.0.0.1", help="Redis server address")
     parser.add_argument("--redis-port", type=int, default=6379, help="Redis server port")
     parser.add_argument("--redis-queue", type=str, default="camera_frames", help="Redis queue name for frames")
+    parser.add_argument(
+        "--max-frames", dest="max_frames", type=int, default=100, help="Maximum number of frames to keep in Redis"
+    )
+    parser.add_argument(
+        "--time-window", dest="time_window", type=float, default=5.0, help="Time window in seconds to keep frames"
+    )
 
     # Source configuration
     parser.add_argument("--source", type=str, required=True, help="Image path, video path, or webcam (webcam:0)")

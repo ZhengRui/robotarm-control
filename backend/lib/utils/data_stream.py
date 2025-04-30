@@ -98,6 +98,8 @@ class RedisDataStreamClient(DataStreamClient):
             self.host = server_config.get("addr", "127.0.0.1")
             self.port = server_config.get("port", 6379)
             self.queue = server_config.get("queue", "camera_frames")
+            self.max_frames = server_config.get("max_frames", None)
+            self.time_window = server_config.get("time_window", None)  # Time window in seconds
             self.rpi_name = socket.gethostname()
 
             self.redis: Optional[Redis] = redis.Redis(
@@ -145,6 +147,36 @@ class RedisDataStreamClient(DataStreamClient):
             # Send to Redis
             if self.redis:
                 queue_length = self.redis.lpush(self.queue, json.dumps(payload))
+
+                # If max_frames is set, trim the list to keep only the latest frames
+                if self.max_frames and queue_length > self.max_frames:
+                    self.redis.ltrim(self.queue, 0, self.max_frames - 1)
+
+                # If time_window is set, remove frames outside the time window
+                if self.time_window:
+                    current_time = time.time()
+                    cutoff_time = current_time - self.time_window
+
+                    # Get the oldest frame (rightmost in the list)
+                    while True:
+                        oldest_frame = self.redis.lindex(self.queue, -1)
+                        if not oldest_frame:
+                            break
+
+                        # Handle different types that might be returned by lindex
+                        if isinstance(oldest_frame, bytes):
+                            oldest_frame_str = oldest_frame.decode("utf-8")
+                        else:
+                            oldest_frame_str = str(oldest_frame)
+
+                        oldest_frame_data = json.loads(oldest_frame_str)
+                        if oldest_frame_data.get("timestamp", 0) < cutoff_time:
+                            # Remove this outdated frame
+                            self.redis.rpop(self.queue)
+                        else:
+                            # Found a frame within the time window, stop checking
+                            break
+
                 return queue_length, True
             return None, False
 
@@ -177,7 +209,8 @@ class DataStream:
             backend: The backend to use ('imagezmq' or 'redis')
             server_config: Server connection parameters
                 For imagezmq: {'addr': '127.0.0.1', 'port': 5555}
-                For redis: {'addr': '127.0.0.1', 'port': 6379, 'queue': 'camera_frames'}
+                For redis: {'addr': '127.0.0.1', 'port': 6379, 'queue': 'camera_frames',
+                           'max_frames': 100, 'time_window': 5.0}
         """
         self.backend = backend.lower()
 
@@ -186,7 +219,13 @@ class DataStream:
             if self.backend == "imagezmq":
                 server_config = {"addr": "127.0.0.1", "port": 5555}
             else:  # redis
-                server_config = {"addr": "127.0.0.1", "port": 6379, "queue": "camera_frames"}
+                server_config = {
+                    "addr": "127.0.0.1",
+                    "port": 6379,
+                    "queue": "camera_frames",
+                    "max_frames": 100,
+                    "time_window": 5.0,  # Default 5 seconds
+                }
 
         self.server_config = server_config
 
