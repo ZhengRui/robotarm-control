@@ -1,8 +1,8 @@
 from typing import Any, Dict, Union
 
-from .armcontrol import ArmControlHandler
+from .arm_control import ArmControlHandler
 from .calibrate import CalibrateHandler
-from .dataloader import DataLoaderHandler
+from .data_loader import DataLoaderHandler
 from .detect import DetectHandler
 
 
