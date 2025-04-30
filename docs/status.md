@@ -29,9 +29,10 @@ The system now uses FastAPI for a modern web API:
 The system employs a modular handler approach:
 
 - **DataLoaderHandler**:
-  - Receives image frames from input sources via imagezmq
+  - Receives image frames from input sources via imagezmq or Redis
   - Provides frames to the pipeline for processing
-  - Currently uses a blocking call that we plan to replace with Redis
+  - Supports both blocking (ImageZMQ) and non-blocking (Redis) implementations
+  - Redis implementation provides better pipeline shutdown handling
 
 - **DetectHandler**:
   - Identifies colored objects (red, green, blue, yellow)
@@ -53,11 +54,21 @@ The system employs a modular handler approach:
 - **BasePipeline**: Abstract base class for all pipeline implementations
 - Signal priority system for handling important commands first
 
-### 5. Type System
+### 5. Data Streaming
+
+- **DataStream**: Streaming interface with pluggable backends
+- **ImageZMQDataStreamClient**: Original implementation with blocking behavior
+- **RedisDataStreamClient**: New implementation with:
+  - Non-blocking operation
+  - Memory management via max_frames and time_window settings
+  - JSON-based message format with Base64 encoding
+  - Metadata support for frames
+
+### 6. Type System
 
 - Comprehensive type annotations throughout the codebase
 - Mypy validation for type safety
-- Clear interfaces between components
+- Clear interfaces between components using abstract base classes
 
 ## Current Implementation Status
 
@@ -81,27 +92,25 @@ The system employs a modular handler approach:
    - Object detection integration
    - Coordinate transformation system
 
-### Known Issues
+4. **Redis Integration**:
+   - Initial implementation complete
+   - Both client (DataStream) and server (DataLoaderHandler) components
+   - Memory management to prevent queue growth
+   - Non-blocking operation with timeout support
+   - Configurable time window for memory management
 
-1. **Blocking Image Reception**:
-   - The `imagezmq` library uses blocking calls which can prevent clean pipeline shutdown
-   - This is a critical issue planned to be addressed with Redis integration
+### Known Issues
 
 ## Future Development
 
 ### Planned Enhancements
 
-1. **Redis Integration**:
-   - Replace blocking imagezmq with Redis-based image streaming
-   - Enable non-blocking image reception with timeouts
-   - Add support for distributed processing of image data
-
-2. **Web-based UI**:
+1. **Web-based UI**:
    - Develop a frontend for visualizing handler results
    - Provide real-time visualization of intermediate processing steps
    - Create an intuitive interface for controlling pipelines and sending signals
 
-3. **Real-time Visualization**:
+2. **Real-time Visualization**:
    - Stream intermediate processing results to the UI
    - Enable debugging and monitoring of pipeline state
    - Provide insights into object detection and robot control
@@ -112,7 +121,8 @@ The system employs a modular handler approach:
 
 Main dependencies include:
 - FastAPI: For the web API server
-- imagezmq: For network-based image transmission (to be replaced with Redis)
+- imagezmq: For network-based image transmission
+- Redis: For non-blocking image streaming
 - OpenCV: For image processing and computer vision
 - pymycobot: For robot arm control
 - NumPy: For numerical operations
@@ -126,6 +136,7 @@ The codebase is organized in a modular fashion:
     - `pipelines/`: Pipeline implementations and management
     - `handlers/`: Specialized processing modules
     - `utils/`: Helper functions and utilities
+  - `config/`: Configuration files for different environments
 - `examples/`: Client-side demonstration code
 - `docs/`: Documentation files
 
@@ -136,3 +147,11 @@ The system supports configuration through:
 - Environment variables for server and pipeline settings
 - Command-line arguments for development and testing
 - JSON-based API for runtime configuration
+
+To setup configuration files:
+```bash
+cp backend/config/dev.example.yaml backend/config/dev.yaml
+cp backend/config/prod.example.yaml backend/config/prod.yaml
+```
+
+Edit these files to customize settings for your environment.

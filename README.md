@@ -9,6 +9,7 @@ A modular system for controlling robot arms with computer vision integration. Th
 - **Pipeline Architecture**: Modular pipeline system with priority-based signal handling
 - **FastAPI Integration**: Modern web API for controlling pipelines and sending signals
 - **Process Management**: Multi-process architecture for reliable pipeline execution
+- **Redis Integration**: Non-blocking image streaming with memory management
 - **Configurable**: Adjust for different robot setups, detection parameters, and tasks
 
 ## Installation
@@ -29,6 +30,7 @@ A modular system for controlling robot arms with computer vision integration. Th
 
 2. Create a virtual environment and activate it using uv:
    ```bash
+   cd backend
    uv venv
    source .venv/bin/activate  # On Windows, use .venv\Scripts\activate
    ```
@@ -45,19 +47,56 @@ A modular system for controlling robot arms with computer vision integration. Th
 
 ## Usage
 
+### Configuration
+
+The system uses YAML configuration files located in the `backend/config/` directory:
+
+- `dev.yaml`: Development environment configuration
+- `prod.yaml`: Production environment configuration
+
+You can copy the example files to create your own configurations:
+
+```bash
+cp backend/config/dev.example.yaml backend/config/dev.yaml
+cp backend/config/prod.example.yaml backend/config/prod.yaml
+```
+
+Edit these files to adjust settings like:
+- Robot arm port and connection parameters
+- Image processing parameters
+- Pipeline default behaviors
+- Redis connection settings
+
 ### Starting the Server
 
-Run the server with a specific pipeline:
+Start the server in debug mode:
 
 ```bash
-python -m backend.main --pipeline yahboom_pick_and_place
+DEBUG=true python train.py
 ```
 
-Or set the initial pipeline through environment variables:
+For additional control, you can specify a pipeline:
 
 ```bash
-PIPELINE=yahboom_pick_and_place DEBUG=true python -m backend.main
+PIPELINE=yahboom_pick_and_place DEBUG=true python train.py
 ```
+
+### Running the Streaming Client
+
+To stream video to the system:
+
+```bash
+python -m examples.streaming --source /path/to/video.mp4 --keep_size --lossless --enable_freeze --visualization --max-frames 100 --time-window 2
+```
+
+Options:
+- `--source`: Video file, webcam (webcam:0), or directory of images
+- `--keep_size`: Maintain original image dimensions
+- `--lossless`: Use lossless encoding for frames
+- `--enable_freeze`: Allow pausing the stream with spacebar
+- `--visualization`: Show video feed with visualization
+- `--max-frames`: Set max number of frames for Redis memory management
+- `--time-window`: Set time window in seconds for Redis memory management
 
 ### API Endpoints
 
@@ -88,11 +127,13 @@ curl -X POST "http://localhost:8000/signal?pipeline_name=yahboom_pick_and_place"
   - `lib/`: Core functionality
     - `pipelines/`: Pipeline implementations with process-based architecture
     - `handlers/`: Specialized handlers for vision and robot control
+    - `utils/`: Helper functions and utilities
+  - `config/`: Configuration files for different environments
 - `examples/`: Client-side demonstration code
 - `docs/`: Documentation files
 
-## TODO
+## Next Steps
 
-- **Redis Integration**: Replace blocking imagezmq with Redis-based image streaming
 - **Web-based UI**: Develop a frontend for visualizing handler results and controlling pipelines
 - **Real-time Visualization**: Stream intermediate processing results to the UI
+- **Additional Robot Models**: Support for different robot arm models and configurations

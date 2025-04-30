@@ -85,6 +85,26 @@ This ensures:
 - Background operations don't interfere with time-sensitive commands
 - The system can handle bursts of signals while maintaining responsiveness
 
+### 4. Dual Backend Data Streaming Architecture
+
+The system supports two interchangeable backends for image data streaming:
+
+```
+┌───────────────┐                     ┌───────────────┐
+│               │      ImageZMQ       │               │
+│  Streaming    ├────────────────────►│  Pipeline     │
+│  Client       │                     │  Process      │
+│               │       Redis         │               │
+│               ├────────────────────►│               │
+└───────────────┘                     └───────────────┘
+```
+
+This design provides:
+- Flexibility to choose the appropriate backend based on requirements
+- Backwards compatibility with existing ImageZMQ implementations
+- Enhanced performance and reliability with Redis
+- Seamless transition between backends with consistent APIs
+
 ## Component Hierarchy
 
 ### Layer 1: FastAPI Server (API Layer)
@@ -251,6 +271,37 @@ Key responsibilities:
 - Processing state transitions
 - Executing state-specific logic
 
+### Layer 6: Data Streaming System (Streaming Layer)
+
+The data streaming system provides interfaces for sending and receiving image data:
+
+```
+┌────────────────────────────────────────────────────────────────────────┐
+│ Streaming Layer                                                        │
+│                                                                        │
+│  ┌───────────────────────────────┐       ┌────────────────────────────┐│
+│  │ DataStream                    │       │ DataLoaderHandler          ││
+│  │                               │       │                            ││
+│  │ ┌─────────────────────────┐   │       │ ┌──────────────────────┐   ││
+│  │ │ ImageZMQDataStreamClient│   │       │ │ ImageZMQDataLoader   │   ││
+│  │ └─────────────────────────┘   │       │ └──────────────────────┘   ││
+│  │                               │       │                            ││
+│  │ ┌─────────────────────────┐   │       │ ┌──────────────────────┐   ││
+│  │ │ RedisDataStreamClient   │   │       │ │ RedisDataLoader      │   ││
+│  │ └─────────────────────────┘   │       │ └──────────────────────┘   ││
+│  │                               │       │                            ││
+│  └───────────────────────────────┘       └────────────────────────────┘│
+│                                                                        │
+└────────────────────────────────────────────────────────────────────────┘
+```
+
+Key responsibilities:
+- Providing a consistent API for image streaming regardless of backend
+- Managing connections to image sources
+- Handling encoding/decoding of image data
+- Implementing memory management for queues
+- Supporting metadata with image frames
+
 ## Signal Flow
 
 Signals follow a well-defined path through the system:
@@ -294,63 +345,117 @@ Each handler:
 
 ## Configuration System
 
-The pipeline is configured through a layered approach:
+The system employs a layered configuration approach with a clear hierarchy of selection and overrides:
 
 ```
-┌────────────────┐
-│ default.yaml   │  Default configuration for all pipelines
-└───────┬────────┘
-        │
-        ▼
-┌────────────────┐
-│ config_override│  Runtime overrides (via API or command line)
-└───────┬────────┘
-        │
-        ▼
-┌────────────────┐
-│ Pipeline       │  Instance-specific configurations
-│ Configuration  │
-└────────────────┘
+┌─────────────────────────────┐  Server Initialization Parameters
+│ Command-line Args / ENV     │  • ENV=[dev|prod]   - Selects which config to load
+│                             │  • PIPELINE=name    - Selects pipeline to auto-start
+│                             │  • DEBUG=[true|false] - Toggles debug mode
+└──────────────┬──────────────┘
+               │ Selects
+               ▼
+┌─────────────────────────────┐
+│ config/{env}.yaml           │  Environment-specific pipeline configurations
+│ (dev.yaml, prod.yaml)       │  Detailed settings for handlers, backends,
+│                             │  and pipeline behaviors
+└──────────────┬──────────────┘
+               │ Merged with
+               ▼
+┌─────────────────────────────┐
+│ lib/pipelines/default.yaml  │  System-wide pipeline defaults
+│                             │  (used for any settings not specified in
+│                             │  the environment config)
+└──────────────┬──────────────┘
+               │ Applied to
+               ▼
+┌─────────────────────────────┐
+│ Pipeline Instance State     │  Runtime state maintained by each
+│                             │  pipeline instance during execution
+└─────────────────────────────┘
 ```
 
-This approach enables:
-- Sensible defaults for all pipelines
-- Pipeline-specific customizations
-- Runtime parameter tuning
-- Configuration reuse across similar pipelines
+Key points about this configuration system:
 
-## Current Known Challenges
+• **Selection Process**:
+  - Command-line args and ENV variables determine *which* config file to load (dev/prod)
+  - They also specify which pipeline to auto-start, if any
+  - They don't override the content of config files, just select which ones to use
 
-### 1. Blocking Image Reception
+• **Configuration Merging**:
+  - The selected environment config (`config/{env}.yaml`) provides environment-specific settings
+  - Any settings not found in the environment config are taken from the system defaults
+  - The merged configuration is then used to initialize the pipeline
 
-The current implementation uses `imagezmq` with a blocking `recv_jpg()` call:
+• **Server Startup Behavior**:
+  - If the `PIPELINE` environment variable is set, the specified pipeline starts automatically
+  - Without the `PIPELINE` variable, the server starts with no active pipelines
+  - The `ENV` variable determines which configuration file to load (defaults to `dev`)
 
-```python
-# In DataLoaderHandler.process()
-rpi_name, msg = self.hub.recv_jpg()  # Blocks until image is received
+• **API Control**:
+  - Regardless of initialization, pipelines can be started, stopped, and managed via API endpoints
+  - `/pipelines/start`, `/pipelines/stop`, `/signal`, etc.
+
+## Redis Integration
+
+### Design Overview
+
+The system now implements Redis as an alternative backend for image streaming:
+
+```
+┌────────────────┐     ┌──────────────┐     ┌────────────────┐
+│                │     │              │     │                │
+│ DataStream     │────►│  Redis       │────►│ DataLoader     │
+│ (Client)       │     │  Server      │     │ (Handler)      │
+│                │     │              │     │                │
+└────────────────┘     └──────────────┘     └────────────────┘
 ```
 
-This causes issues:
-- Pipeline cannot check the stop_event while waiting for an image
-- Clean shutdown becomes difficult
-- Responsiveness to signals can be delayed
+### Implementation Details
 
-### 2. Planned Solution: Redis Integration
+1. **Client Side (DataStream)**
+   - Abstract `DataStreamClient` base class with backend-agnostic interface
+   - `ImageZMQDataStreamClient` for backward compatibility
+   - `RedisDataStreamClient` for modern, non-blocking operation
+   - Base64 encoding for JSON compatibility in Redis
 
-The planned Redis integration will solve this issue through non-blocking operations:
+2. **Server Side (DataLoaderHandler)**
+   - Abstract `BaseDataLoaderHandler` interface
+   - `ImageZMQDataLoaderHandler` for backward compatibility
+   - `RedisDataLoaderHandler` for non-blocking operation
+   - Support for waiting with timeouts or immediate return
 
-```python
-# Future implementation with Redis
-frame_data = self.redis.blpop("camera_frames", timeout=0.1)  # Non-blocking with timeout
-if not frame_data:
-    return None  # Allow pipeline to check stop_event
-```
+3. **Memory Management**
+   - Configurable memory limits via `max_frames` parameter
+   - Time-based cleanup via `time_window` parameter (in seconds)
+   - Automatic queue trimming to prevent memory overflow
+   - Time-stamped frames for chronological management
 
-Benefits:
-- Non-blocking operation with timeouts
-- Pipeline can check stop_event regularly
-- Improved system responsiveness
-- Better error handling
+### Benefits
+
+The Redis integration delivers several important benefits:
+
+1. **Non-blocking Operation**
+   - Timeouts allow the pipeline to check for shutdown signals
+   - Improved responsiveness to control commands
+   - Better pipeline termination handling
+
+2. **Memory Management**
+   - Prevents memory leaks from unbounded queue growth
+   - Two complementary approaches:
+     - Frame count limit with `max_frames`
+     - Time-based expiration with `time_window`
+   - Automatic cleanup of outdated frames
+
+3. **Scalability**
+   - Support for multiple consumers of the same stream
+   - Ability to distribute processing across multiple nodes
+   - Higher throughput compared to point-to-point communication
+
+4. **Reliability**
+   - Persistence options for critical applications
+   - Built-in handling for connection issues
+   - Greater fault tolerance in network environments
 
 ## Future Development
 
@@ -410,5 +515,4 @@ The Modulus Robot Arm Control system embodies key architectural principles:
 3. **Responsive Design**: Priority queues ensure critical operations aren't delayed
 4. **Configuration Over Code**: YAML-based configuration enables flexibility
 5. **Extensibility**: New pipelines can be added without modifying core code
-
-These principles create a robust foundation for robot control applications while enabling future enhancements like Redis integration and web-based visualization.
+6. **Interchangeable Backends**: Support for both ImageZMQ (not recommended) and Redis backends

@@ -9,6 +9,7 @@
 - **管道架构**：模块化管道系统，具有基于优先级的信号处理
 - **FastAPI 集成**：用于控制管道和发送信号的现代 Web API
 - **进程管理**：可靠管道执行的多进程架构
+- **Redis 集成**：非阻塞图像流传输与内存管理
 - **可配置性**：适应不同的机器人设置、检测参数和任务
 
 ## 安装
@@ -29,6 +30,7 @@
 
 2. 使用 uv 创建并激活虚拟环境：
    ```bash
+   cd backend
    uv venv
    source .venv/bin/activate  # 在 Windows 上，使用 .venv\Scripts\activate
    ```
@@ -45,19 +47,56 @@
 
 ## 使用方法
 
+### 配置
+
+系统使用位于 `backend/config/` 目录中的 YAML 配置文件：
+
+- `dev.yaml`：开发环境配置
+- `prod.yaml`：生产环境配置
+
+您可以复制示例文件来创建自己的配置：
+
+```bash
+cp backend/config/dev.example.yaml backend/config/dev.yaml
+cp backend/config/prod.example.yaml backend/config/prod.yaml
+```
+
+编辑这些文件以调整设置，如：
+- 机器人手臂端口和连接参数
+- 图像处理参数
+- 管道默认行为
+- Redis 连接设置
+
 ### 启动服务器
 
-使用特定管道运行服务器：
+以调试模式启动服务器：
 
 ```bash
-python -m backend.main --pipeline yahboom_pick_and_place
+DEBUG=true python train.py
 ```
 
-或通过环境变量设置初始管道：
+如需更多控制，可以指定管道：
 
 ```bash
-PIPELINE=yahboom_pick_and_place DEBUG=true python -m backend.main
+PIPELINE=yahboom_pick_and_place DEBUG=true python train.py
 ```
+
+### 运行流媒体客户端
+
+向系统流式传输视频：
+
+```bash
+python -m examples.streaming --source /path/to/video.mp4 --keep_size --lossless --enable_freeze --visualization --max-frames 100 --time-window 2
+```
+
+选项：
+- `--source`：视频文件、网络摄像头（webcam:0）或图像目录
+- `--keep_size`：保持原始图像尺寸
+- `--lossless`：使用无损编码传输帧
+- `--enable_freeze`：允许使用空格键暂停流
+- `--visualization`：显示带有可视化效果的视频流
+- `--max-frames`: 设置 Redis 内存管理的最大保存帧数
+- `--time-window`：设置 Redis 内存管理的时间窗口（以秒为单位）
 
 ### API 端点
 
@@ -88,11 +127,13 @@ curl -X POST "http://localhost:8000/signal?pipeline_name=yahboom_pick_and_place"
   - `lib/`：核心功能
     - `pipelines/`：基于进程架构的管道实现
     - `handlers/`：用于视觉和机器人控制的专门处理器
+    - `utils/`：辅助函数和工具
+  - `config/`：不同环境的配置文件
 - `examples/`：客户端演示代码
 - `docs/`：文档文件
 
-## 待办事项
+## 后续计划
 
-- **Redis 集成**：用基于 Redis 的图像流替换阻塞的 imagezmq
 - **Web 前端**：开发用于可视化处理器结果和控制管道的前端界面
 - **实时可视化**：将中间处理结果流式传输到 UI
+- **额外机器人型号**：支持不同的机器人手臂型号和配置
