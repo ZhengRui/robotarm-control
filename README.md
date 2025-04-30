@@ -96,7 +96,3 @@ curl -X POST "http://localhost:8000/signal?pipeline_name=yahboom_pick_and_place"
 - **Redis Integration**: Replace blocking imagezmq with Redis-based image streaming
 - **Web-based UI**: Develop a frontend for visualizing handler results and controlling pipelines
 - **Real-time Visualization**: Stream intermediate processing results to the UI
-
-## Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.

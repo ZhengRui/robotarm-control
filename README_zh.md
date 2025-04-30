@@ -96,7 +96,3 @@ curl -X POST "http://localhost:8000/signal?pipeline_name=yahboom_pick_and_place"
 - **Redis 集成**：用基于 Redis 的图像流替换阻塞的 imagezmq
 - **Web 前端**：开发用于可视化处理器结果和控制管道的前端界面
 - **实时可视化**：将中间处理结果流式传输到 UI
-
-## 贡献
-
-欢迎贡献！请随时提交拉取请求。
