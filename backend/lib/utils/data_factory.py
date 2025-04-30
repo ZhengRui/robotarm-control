@@ -35,7 +35,7 @@ class DataFactory:
                     resp = requests.get(source, stream=True, timeout=5)
                     resp.raise_for_status()
 
-                    tmp_source = "/tmp/segrec/source.jpg"
+                    tmp_source = "/tmp/source.jpg"
                     with open(tmp_source, "wb") as of:
                         try:
                             shutil.copyfileobj(resp.raw, of)
