@@ -17,3 +17,7 @@ logs/
 .pytest_cache/
 
 .env
+
+config/*.yaml
+!config/default.yaml
+!config/*.example.yaml

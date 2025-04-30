@@ -145,10 +145,6 @@ class BasePipeline(ABC):
                 # Extract initialization parameters from the 'init' section if it exists
                 init_params = handler_config.get("init", {})
 
-                # If no 'init' section, use the whole config except 'process' section
-                if not init_params:
-                    init_params = {k: v for k, v in handler_config.items() if k != "process"}
-
                 # Create the handler with initialization parameters
                 handlers[handler_type] = HandlerFactory.create_handler(handler_type=handler_type, config=init_params)
             except ValueError:

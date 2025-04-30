@@ -9,6 +9,8 @@ from pydantic import BaseModel
 from lib.pipelines import PipelineFactory, SignalPriority
 from lib.utils.logger import get_logger
 
+from ..config import config
+
 # Initialize logger
 logger = get_logger("api")
 
@@ -121,7 +123,9 @@ async def start_pipeline(request: PipelineRequest):
     """
     try:
         # Create and start the pipeline
-        success = PipelineFactory.create_pipeline(request.pipeline_name, debug=request.debug)
+        success = PipelineFactory.create_pipeline(
+            request.pipeline_name, config_override=config.get(request.pipeline_name, {}), debug=request.debug
+        )
 
         if not success:
             raise HTTPException(status_code=500, detail=f"Failed to start pipeline '{request.pipeline_name}'")
@@ -172,7 +176,9 @@ async def startup_event():
     if initial_pipeline:
         try:
             logger.info(f"Starting initial pipeline '{initial_pipeline}' (debug={initial_debug})")
-            success = PipelineFactory.create_pipeline(initial_pipeline, debug=initial_debug)
+            success = PipelineFactory.create_pipeline(
+                initial_pipeline, config_override=config.get(initial_pipeline, {}), debug=initial_debug
+            )
             if not success:
                 logger.error(f"Failed to start initial pipeline '{initial_pipeline}'")
         except Exception as e:

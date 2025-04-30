@@ -1,23 +1,24 @@
 yahboom_pick_and_place:
   dataloader:
-    name: "redis"
     init:
+      name: "redis"
       host: "127.0.0.1"
       port: 6379
       db: 0
+      password: null
     process:
       queue: "camera_frames"
       wait: true
       timeout: 0.5
 
   calibrate:
-    name: "yahboom"
     init:
+      name: "yahboom"
       binary_threshold: 140
 
   detect:
-    name: "yahboom"
     init:
+      name: "yahboom"
       color_hsv_thresholds:
         red: [[0, 43, 46], [10, 255, 255]]
         green: [[35, 43, 46], [77, 255, 255]]
@@ -29,8 +30,8 @@ yahboom_pick_and_place:
         offset: [0.27, 0.0762]
 
   # armcontrol:
-  #   name: "yahboom"
   #   init:
+  #     name: "yahboom"
   #     task: "pick_and_place"
   #     grasp_offset: [0.005, 0]
   #     init_angles: [39, 0, 0, -71, -8, -8]
