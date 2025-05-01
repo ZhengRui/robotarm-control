@@ -1,0 +1,31 @@
+---
+description: Project Overview
+globs:
+alwaysApply: false
+---
+# Project Overview
+
+This repository contains the Modulus Robot Arm Control system, a modular framework for controlling robot arms with computer vision integration.
+
+## Package Managers
+
+- Backend: Uses **uv** as the Python package manager ([uv.lock](mdc:backend/uv.lock))
+- Frontend: Uses **bun** as the JavaScript/TypeScript package manager ([bun.lockb](mdc:frontend/bun.lockb))
+
+## Key Directories
+
+- [backend/](mdc:backend) - Python-based server implementation with FastAPI
+  - [backend/app/](mdc:backend/app) - FastAPI application and endpoints
+  - [backend/lib/](mdc:backend/lib) - Core functionality including pipelines and handlers
+  - [backend/config/](mdc:backend/config) - Configuration files for different environments
+- [frontend/](mdc:frontend) - Next.js dashboard for monitoring and controlling the system
+  - [frontend/src/](mdc:frontend/src) - Source code for the frontend application
+- [docs/](mdc:docs) - Documentation files
+  - [docs/design.md](mdc:docs/design.md) - Detailed system architecture design
+  - [docs/status.md](mdc:docs/status.md) - Current project status report
+- [examples/](mdc:backend/examples) - Client-side demonstration code
+
+## Main Entry Points
+
+- [backend/main.py](mdc:backend/main.py) - Main entry point for the backend server
+- [frontend/src/app/page.tsx](mdc:frontend/src/app/page.tsx) - Main page component for the frontend

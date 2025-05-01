@@ -1,0 +1,55 @@
+---
+description: Pipeline System
+globs:
+alwaysApply: false
+---
+# Pipeline System
+
+The core of the Modulus Robot Arm Control system is its pipeline architecture, which implements a state machine pattern for robot control.
+
+## Pipeline Architecture
+
+- **Process-based**: Each pipeline runs in its own dedicated process
+- **State Machine**: Pipelines function as state machines with well-defined transitions
+- **Signal-driven**: External signals trigger state changes and actions
+- **Priority-based**: Critical signals (e.g., emergency stop) are processed first
+
+## Key Components
+
+- [backend/lib/pipelines/base.py](mdc:backend/lib/pipelines/base.py) - Base pipeline class with core functionality
+- [backend/lib/pipelines/factory.py](mdc:backend/lib/pipelines/factory.py) - Factory for creating pipeline instances
+- [backend/lib/pipelines/manager.py](mdc:backend/lib/pipelines/manager.py) - Manages multiple pipeline processes
+- [backend/lib/pipelines/process.py](mdc:backend/lib/pipelines/process.py) - Encapsulates a pipeline in a separate process
+
+## Pipeline Flow
+
+```
+┌───────────────────┐     ┌───────────────────────────────┐
+│                   │     │ Process 1                     │
+│                   │     │ ┌───────────┐  ┌───────────┐  │
+│                   │     │ │ Pipeline  │  │ Signal    │  │
+│  FastAPI Server   │◄───►│ │ Instance  │◄─┤ Thread    │  │
+│                   │     │ └───────────┘  └───────────┘  │
+│                   │     └───────────────────────────────┘
+└───────────────────┘
+```
+
+## Signal System
+
+Signals follow this path:
+1. API endpoint receives request
+2. Signal is routed to appropriate pipeline
+3. Signal is placed in priority queue
+4. Signal thread processes signal based on priority
+5. Pipeline handles signal and may change state
+6. Next step execution reflects the new state
+
+## Handler Integration
+
+Each pipeline step processes data through a chain of handlers:
+```
+┌────────────────┐     ┌────────────────┐     ┌────────────────┐
+│ DataLoader     │────►│ Detect         │────►│ ArmControl     │
+│ Handler        │     │ Handler        │     │ Handler        │
+└────────────────┘     └────────────────┘     └────────────────┘
+```

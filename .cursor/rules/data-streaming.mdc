@@ -1,0 +1,57 @@
+---
+description: Data Streaming System
+globs:
+alwaysApply: false
+---
+# Data Streaming System
+
+The Modulus Robot Arm Control system implements two interchangeable backends for image data streaming.
+
+## Architecture Overview
+
+```
+┌───────────────┐                     ┌───────────────┐
+│               │      ImageZMQ       │               │
+│  Streaming    ├────────────────────►│  Pipeline     │
+│  Client       │                     │  Process      │
+│               │       Redis         │               │
+│               ├────────────────────►│               │
+└───────────────┘                     └───────────────┘
+```
+
+## Implementation Components
+
+### Client Side
+- [backend/examples/streaming.py](mdc:backend/examples/streaming.py) - Example streaming client
+- **DataStreamClient**: Abstract base class for streaming implementations
+- **ImageZMQDataStreamClient**: Original blocking implementation
+- **RedisDataStreamClient**: Modern non-blocking implementation
+
+### Server Side
+- [backend/lib/handlers/data_loader.py](mdc:backend/lib/handlers/data_loader.py) - Handler for loading streamed data
+- **BaseDataLoaderHandler**: Abstract interface
+- **ImageZMQDataLoaderHandler**: For backward compatibility
+- **RedisDataLoaderHandler**: Non-blocking implementation with timeout support
+
+## Key Features
+
+### Redis Implementation Benefits
+
+- **Non-blocking Operation**:
+  - Timeouts allow the pipeline to check for shutdown signals
+  - Improved responsiveness to control commands
+
+- **Memory Management**:
+  - Prevents memory leaks via configurable limits
+  - Frame count limiting with `max_frames`
+  - Time-based expiration with `time_window`
+
+- **Reliability**:
+  - Connection handling for network environments
+  - Better fault tolerance
+
+### Data Format
+
+- Base64-encoded image data for Redis compatibility
+- JSON message format with metadata support
+- Timestamp integration for chronological management

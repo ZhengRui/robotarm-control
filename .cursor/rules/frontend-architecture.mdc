@@ -1,0 +1,51 @@
+---
+description: Frontend Architecture
+globs:
+alwaysApply: false
+---
+# Frontend Architecture
+
+The frontend is a modern Next.js application that provides a dashboard for monitoring and controlling the robot arm system.
+
+## Development Setup
+
+- Uses **bun** as the JavaScript/TypeScript package manager ([package.json](mdc:frontend/package.json))
+- Installation: `cd frontend && bun install`
+- Run development server: `bun run dev`
+- Build for production: `bun run build`
+
+## Tech Stack
+
+- **Next.js**: React framework with server-side rendering
+- **TypeScript**: Type-safe JavaScript
+- **Tailwind CSS**: Utility-first CSS framework
+- **Shadcn/UI**: High-quality UI components
+
+## Directory Structure
+
+- [frontend/src/app/](mdc:frontend/src/app) - Next.js application pages
+  - Page-based routing with React Server Components
+  - API routes for client-side communication
+
+- [frontend/src/components/](mdc:frontend/src/components) - Reusable UI components
+  - UI building blocks for the dashboard
+  - Specialized components for robot control visualization
+
+- [frontend/src/lib/](mdc:frontend/src/lib) - Utility functions and helpers
+  - API client for backend communication
+  - WebSocket integration for real-time updates
+  - Data formatting and transformation
+
+## Key Features
+
+- Pipeline management (list, start, stop)
+- Configuration editing
+- Signal control with different priority levels
+- Real-time frame visualization
+- Status monitoring of active pipelines
+
+## Communication with Backend
+
+- REST API calls for basic operations (list pipelines, start/stop)
+- WebSocket connection for real-time updates
+- Image streaming for visualization of camera feed and detection results

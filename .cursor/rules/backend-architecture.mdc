@@ -1,0 +1,46 @@
+---
+description: Backend Architecture
+globs:
+alwaysApply: false
+---
+# Backend Architecture
+
+The backend system follows a pipeline-based architecture for robot arm control with computer vision integration.
+
+## Development Setup
+
+- Uses **uv** as the Python package manager ([pyproject.toml](mdc:backend/pyproject.toml))
+- Installation: `cd backend && uv venv && source .venv/bin/activate && uv sync`
+- Python 3.8+ required (specified in [.python-version](mdc:backend/.python-version))
+
+## Core Components
+
+### Pipeline System
+- [backend/lib/pipelines/](mdc:backend/lib/pipelines) - Contains pipeline implementations
+  - Each pipeline runs in its own process for stability
+  - Uses priority-based signal handling for responsive control
+  - Implements state machine pattern for predictable transitions
+
+### Handler System
+- [backend/lib/handlers/](mdc:backend/lib/handlers) - Specialized processing modules
+  - **DataLoaderHandler**: Loads images from streams (ImageZMQ or Redis)
+  - **DetectHandler**: Identifies objects in frames
+  - **ArmControlHandler**: Controls the robot arm
+
+### API Layer
+- [backend/app/api/](mdc:backend/app/api) - FastAPI endpoints
+  - Provides RESTful interface for controlling pipelines
+  - Handles signal transmission with priority levels
+  - Manages pipeline lifecycle (start/stop)
+
+### Configuration
+- [backend/config/](mdc:backend/config) - YAML configuration files
+  - Environment-specific settings (dev.yaml, prod.yaml)
+  - Pipeline and handler configuration
+
+## Data Flow
+1. Image frames are received via ImageZMQ or Redis
+2. Frames are processed by the DetectHandler to identify objects
+3. Object information is passed to the ArmControlHandler
+4. The robot arm executes actions based on detected objects
+5. The pipeline reports status back to the API layer
