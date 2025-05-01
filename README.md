@@ -11,8 +11,25 @@ A modular system for controlling robot arms with computer vision integration. Th
 - **Process Management**: Multi-process architecture for reliable pipeline execution
 - **Redis Integration**: Non-blocking image streaming with memory management
 - **Configurable**: Adjust for different robot setups, detection parameters, and tasks
+- **Modern Web Dashboard**: Next.js frontend for monitoring and controlling the system
 
-## Installation
+## Project Structure
+
+- `backend/`: Server-side implementation
+  - `app/`: FastAPI application and endpoints
+  - `lib/`: Core functionality
+    - `pipelines/`: Pipeline implementations with process-based architecture
+    - `handlers/`: Specialized handlers for vision and robot control
+    - `utils/`: Helper functions and utilities
+  - `config/`: Configuration files for different environments
+- `frontend/`: Next.js dashboard
+  - Modern UI for monitoring and controlling pipelines
+  - WebSocket integration for real-time updates
+- `examples/`: Client-side demonstration code
+- `.hooks/`: Project-wide git hooks
+- `docs/`: Documentation files
+
+## Backend Setup
 
 ### Prerequisites
 
@@ -20,7 +37,7 @@ A modular system for controlling robot arms with computer vision integration. Th
 - USB connection to the robot arm (for control functionality)
 - Camera (USB webcam, IP camera, or video file)
 
-### Setup
+### Installation
 
 1. Clone the repository:
    ```bash
@@ -45,8 +62,6 @@ A modular system for controlling robot arms with computer vision integration. Th
 1. Connect the Yahboom MyCobot 280 to your computer via USB
 2. The default port is set to `/dev/ttyUSB0`. If your robot is connected to a different port, you'll need to specify it in your configuration.
 
-## Usage
-
 ### Configuration
 
 The system uses YAML configuration files located in the `backend/config/` directory:
@@ -67,7 +82,7 @@ Edit these files to adjust settings like:
 - Pipeline default behaviors
 - Redis connection settings
 
-### Starting the Server
+### Starting the Backend Server
 
 Start the server in debug mode:
 
@@ -120,20 +135,84 @@ Send a signal:
 curl -X POST "http://localhost:8000/signal?pipeline_name=yahboom_pick_and_place" -H "Content-Type: application/json" -d '{"signal": "pick_red", "priority": "HIGH"}'
 ```
 
-## Project Structure
+## Frontend Setup
 
-- `backend/`: Main server implementation
-  - `app/`: FastAPI application and endpoints
-  - `lib/`: Core functionality
-    - `pipelines/`: Pipeline implementations with process-based architecture
-    - `handlers/`: Specialized handlers for vision and robot control
-    - `utils/`: Helper functions and utilities
-  - `config/`: Configuration files for different environments
-- `examples/`: Client-side demonstration code
-- `docs/`: Documentation files
+### Tech Stack
+
+- **Next.js**: React framework with server-side rendering
+- **TypeScript**: Type-safe JavaScript
+- **Tailwind CSS**: Utility-first CSS framework
+- **Shadcn/UI**: High-quality, accessible UI components
+
+### Architecture
+
+- **Backend Communication**:
+  - REST API for basic operations (list pipelines, start/stop)
+  - WebSocket bridge for real-time updates and streaming
+  - Redis for backend pipeline communication
+
+- **UI Layout**:
+  - Left sidebar: Foldable configuration panel for pipeline settings
+  - Main area: Visualization of streaming frames and pipeline output
+
+### Installation
+
+```bash
+# Navigate to frontend directory
+cd frontend
+
+# Install dependencies
+bun install
+
+# Run development server
+bun run dev
+```
+
+### Building
+
+```bash
+# Build for production
+bun run build
+
+# Start production server
+bun run start
+```
+
+### Features
+
+- Pipeline management (list, start, stop)
+- Configuration editing
+- Signal control
+- Real-time frame visualization
+- Status monitoring
+
+## Git Hooks Setup
+
+This project uses git hooks to ensure code quality and consistent commit messages.
+
+### Setting Up Hooks
+
+1. First, prepare the Husky hooks in the frontend directory:
+   ```bash
+   cd frontend
+   bun run prepare:husky
+   cd ..
+   ```
+
+2. Reset the hooks path to use the project's custom hooks:
+   ```bash
+   git config core.hooksPath .hooks
+   ```
+
+This two-step process ensures that both frontend and backend hooks are properly installed. The first command sets up Husky in the frontend directory, but it also changes your git hooks path to `frontend/.husky`. The second command resets the hooks path to the project root's `.hooks` directory, which contains the hooks for the entire project.
+
+### Hook Functions
+
+- **pre-commit**: Runs linting and formatting checks for both frontend and backend code
+- **commit-msg**: Validates commit messages according to conventional commit format
 
 ## Next Steps
 
-- **Web-based UI**: Develop a frontend for visualizing handler results and controlling pipelines
-- **Real-time Visualization**: Stream intermediate processing results to the UI
 - **Additional Robot Models**: Support for different robot arm models and configurations
+- **Enhanced UI Features**: Expand dashboard capabilities for better visualization and control
+- **Real-time Analytics**: Add metrics and performance monitoring
