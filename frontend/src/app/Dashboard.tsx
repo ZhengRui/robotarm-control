@@ -26,6 +26,7 @@ import {
 } from "@/atoms";
 import MobileResizeHandle from "./MobileResizeHandle";
 import VisualizationCard from "./VisualizationCard";
+import { ReadOnlySelect } from "@/components/ui/custom-select";
 
 const Dashboard = () => {
   const [selectedPipeline, setSelectedPipeline] = useAtom(selectedPipelineAtom);
@@ -42,8 +43,8 @@ const Dashboard = () => {
 
   // Get data from atoms
   const [availablePipelines] = useAtom(availablePipelinesAtom);
-  const [pipelineStatuses] = useAtom(pipelineStatusesAtom);
   const [pipelineSignals] = useAtom(pipelineSignalsAtom);
+  const [pipelineStatuses] = useAtom(pipelineStatusesAtom);
 
   const MIN_SIZE_IN_PIXELS = 400;
   const MAX_SIZE_IN_PIXELS = 500;
@@ -191,22 +192,16 @@ const Dashboard = () => {
                 </div>
               </div>
               <CardContent className="px-5 py-3 overflow-y-auto h-[calc(100%-3rem)]">
-                <h2 className="text-sm font-semibold mb-2">Status</h2>
-                <div className="flex flex-wrap gap-2 mb-4">
-                  {pipelineStatuses.map((status) => (
-                    <div
-                      key={status}
-                      style={{ boxSizing: "border-box" }}
-                      className={cn(
-                        "inline-flex items-center justify-center rounded-full px-3 py-1.5 text-xs font-semibold h-7 min-w-[60px]",
-                        status === currentStatus
-                          ? "bg-black text-white border border-transparent"
-                          : "border border-muted bg-background text-muted-foreground"
-                      )}
-                    >
-                      {status}
-                    </div>
-                  ))}
+                <div className="flex items-center justify-between mb-2">
+                  <h2 className="text-sm font-semibold">Status</h2>
+                  <div className="flex items-center">
+                    <ReadOnlySelect
+                      value={currentStatus}
+                      options={pipelineStatuses}
+                      label="Status"
+                      width="120px"
+                    />
+                  </div>
                 </div>
 
                 <div className="h-px bg-gray-300/50 my-2"></div>
@@ -387,22 +382,16 @@ const Dashboard = () => {
                     </div>
                   </div>
                   <CardContent className="px-5 py-3 overflow-y-auto h-full">
-                    <h2 className="text-sm font-semibold mb-2">Status</h2>
-                    <div className="flex flex-wrap gap-2 mb-4">
-                      {pipelineStatuses.map((status) => (
-                        <div
-                          key={status}
-                          style={{ boxSizing: "border-box" }}
-                          className={cn(
-                            "inline-flex items-center justify-center rounded-full px-3 py-1.5 text-xs font-semibold h-7 min-w-[60px]",
-                            status === currentStatus
-                              ? "bg-black text-white border border-transparent"
-                              : "border border-muted bg-background text-muted-foreground"
-                          )}
-                        >
-                          {status}
-                        </div>
-                      ))}
+                    <div className="flex items-center justify-between mb-2">
+                      <h2 className="text-sm font-semibold">Status</h2>
+                      <div className="flex items-center">
+                        <ReadOnlySelect
+                          value={currentStatus}
+                          options={pipelineStatuses}
+                          label="Status"
+                          width="120px"
+                        />
+                      </div>
                     </div>
 
                     <div className="h-px bg-gray-300/50 my-2"></div>

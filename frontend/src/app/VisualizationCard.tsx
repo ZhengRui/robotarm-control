@@ -2,7 +2,6 @@
 
 import { useAtom } from "jotai";
 import { Card, CardContent } from "@/components/ui/card";
-import { cn } from "@/lib/utils";
 import {
   RefreshCw,
   Settings,
@@ -16,6 +15,7 @@ import {
   selectedQueueAtom,
   pipelineQueuesAtom,
 } from "@/atoms";
+import { MultiSelect, Tag, TagsContainer } from "@/components/ui/custom-select";
 
 const VisualizationCard = () => {
   const [selectedPipeline] = useAtom(selectedPipelineAtom);
@@ -24,19 +24,8 @@ const VisualizationCard = () => {
   const [pipelineQueues] = useAtom(pipelineQueuesAtom);
 
   // Handle queue selection (now supports multi-select)
-  const handleQueueClick = (queue: string) => {
-    setSelectedQueues((prev) => {
-      // If already selected, remove it
-      if (prev.includes(queue)) {
-        return prev.filter((q) => q !== queue);
-      }
-      // Otherwise add it to selection
-      return [...prev, queue];
-    });
-    console.log(
-      `Queue ${selectedQueues.includes(queue) ? "unselected" : "selected"}:`,
-      queue
-    );
+  const handleQueueSelection = (newSelection: string[]) => {
+    setSelectedQueues(newSelection);
   };
 
   return (
@@ -84,39 +73,32 @@ const VisualizationCard = () => {
         <div className="mb-4">
           <div className="flex justify-between items-center mb-2">
             <h3 className="text-sm font-semibold">Stream Queues</h3>
-            {selectedQueues.length > 0 && (
-              <button
-                onClick={() => setSelectedQueues([])}
-                className="text-xs text-muted-foreground hover:text-foreground"
-              >
-                Clear Selection
-              </button>
-            )}
+            <MultiSelect
+              label="Stream Queues"
+              selectedValues={selectedQueues}
+              options={pipelineQueues}
+              onChange={handleQueueSelection}
+              disabled={!selectedPipeline || !pipelineRunning}
+              placeholder="Select queues"
+            />
           </div>
-          <div className="flex flex-wrap gap-2 mb-4">
-            {pipelineQueues.map((queue) => (
-              <button
-                key={queue}
-                type="button"
-                onClick={() => handleQueueClick(queue)}
-                disabled={!selectedPipeline || !pipelineRunning}
-                style={{
-                  boxSizing: "border-box",
-                }} /* Ensure border is included in size calc */
-                className={cn(
-                  "inline-flex items-center justify-center rounded-full px-3 py-1.5 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring h-7 min-w-[60px]",
-                  !selectedPipeline || !pipelineRunning
-                    ? "opacity-50 cursor-not-allowed"
-                    : "cursor-pointer",
-                  selectedQueues.includes(queue)
-                    ? "bg-primary text-primary-foreground hover:bg-primary/90 border border-transparent"
-                    : "border border-muted bg-background hover:bg-muted/80 text-muted-foreground"
-                )}
-              >
-                {queue}
-              </button>
-            ))}
-          </div>
+
+          {/* Selected queue tags display */}
+          {selectedQueues.length > 0 && (
+            <TagsContainer>
+              {selectedQueues.map((queue) => (
+                <Tag
+                  key={queue}
+                  label={queue}
+                  onRemove={() => {
+                    setSelectedQueues(
+                      selectedQueues.filter((q) => q !== queue)
+                    );
+                  }}
+                />
+              ))}
+            </TagsContainer>
+          )}
         </div>
 
         <div className="flex-1 flex items-start justify-center min-h-[100px]">
