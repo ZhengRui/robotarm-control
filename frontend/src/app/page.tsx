@@ -12,7 +12,14 @@ import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import { Card, CardContent } from "@/components/ui/card";
 import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels";
-import { Loader2 } from "lucide-react";
+import {
+  Loader2,
+  Settings,
+  List,
+  RefreshCw,
+  Download,
+  MoreHorizontal,
+} from "lucide-react";
 
 export default function Dashboard() {
   const [selectedPipeline, setSelectedPipeline] = useState<string | null>(
@@ -265,23 +272,58 @@ export default function Dashboard() {
 
         {/* Main Content */}
         <Panel className="p-.5 pt-15 pb-3 pr-3" order={2}>
-          <Card className="h-full shadow-sm rounded-md overflow-auto border-0 bg-gray-200">
-            <CardContent className="p-5 flex items-center justify-center h-full">
-              <div className="text-center max-w-md">
-                <h3 className="text-xl font-medium mb-3">
-                  Frame Visualization
-                </h3>
-                <p className="text-muted-foreground">
-                  {selectedPipeline
-                    ? `Select a queue from ${selectedPipeline} to visualize frames.`
-                    : "Select a pipeline and connect to a queue to see frames."}
-                </p>
-                {/* Debug section */}
-                <div className="mt-4 p-4 bg-muted/10 rounded text-left text-xs">
-                  <p>Selected Pipeline: {selectedPipeline || "None"}</p>
-                  <p>Running: {pipelineRunning ? "Yes" : "No"}</p>
-                  <p>Current Status: {currentStatus}</p>
-                  <p>Selected Signal: {selectedSignal || "None"}</p>
+          <Card className="h-full shadow-sm rounded-md overflow-auto border-0 bg-gray-200 p-0">
+            <CardContent className="px-5 py-3 flex flex-col h-full">
+              <div className="flex justify-between items-start mb-4">
+                <h3 className="text-sm font-semibold">Visualization</h3>
+                <div className="flex items-center gap-2">
+                  {/* Icon buttons group */}
+                  <button
+                    className="size-8 inline-flex items-center justify-center rounded-md border border-input bg-background hover:bg-accent hover:text-accent-foreground"
+                    title="Refresh"
+                  >
+                    <RefreshCw className="size-4" />
+                  </button>
+                  <button
+                    className="size-8 inline-flex items-center justify-center rounded-md border border-input bg-background hover:bg-accent hover:text-accent-foreground"
+                    title="Settings"
+                  >
+                    <Settings className="size-4" />
+                  </button>
+                  <button
+                    className="size-8 inline-flex items-center justify-center rounded-md border border-input bg-background hover:bg-accent hover:text-accent-foreground"
+                    title="Download"
+                  >
+                    <Download className="size-4" />
+                  </button>
+                  <button
+                    className="size-8 inline-flex items-center justify-center rounded-md border border-input bg-background hover:bg-accent hover:text-accent-foreground"
+                    title="Logs"
+                  >
+                    <List className="size-4" />
+                  </button>
+                  <button
+                    className="size-8 inline-flex items-center justify-center rounded-md border border-input bg-background hover:bg-accent hover:text-accent-foreground"
+                    title="More options"
+                  >
+                    <MoreHorizontal className="size-4" />
+                  </button>
+                </div>
+              </div>
+              <div className="flex-1 flex items-center justify-center">
+                <div className="text-center max-w-md">
+                  <p className="text-muted-foreground">
+                    {selectedPipeline
+                      ? `Select a queue from ${selectedPipeline} to visualize frames.`
+                      : "Select a pipeline and connect to a queue to see frames."}
+                  </p>
+                  {/* Debug section */}
+                  <div className="mt-4 p-4 bg-muted/10 rounded text-left text-xs">
+                    <p>Selected Pipeline: {selectedPipeline || "None"}</p>
+                    <p>Running: {pipelineRunning ? "Yes" : "No"}</p>
+                    <p>Current Status: {currentStatus}</p>
+                    <p>Selected Signal: {selectedSignal || "None"}</p>
+                  </div>
                 </div>
               </div>
             </CardContent>
