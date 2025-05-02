@@ -7,7 +7,7 @@ export const currentStatusAtom = atom<string>("PICKING");
 
 // Signal and queue state atoms
 export const selectedSignalAtom = atom<string | null>(null);
-export const selectedQueueAtom = atom<string | null>(null);
+export const selectedQueueAtom = atom<string[]>([]);
 
 // Data atoms
 export const availablePipelinesAtom = atom<string[]>([

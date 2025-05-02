@@ -148,7 +148,7 @@ const Dashboard = () => {
                     {/* Show both labels on md screens and up */}
                     <span
                       className={cn(
-                        "text-[10px] font-semibold hidden md:inline",
+                        "text-xs font-semibold hidden md:inline",
                         pipelineRunning
                           ? "text-muted-foreground"
                           : "text-primary"
@@ -167,7 +167,7 @@ const Dashboard = () => {
                     {/* On larger screens, show the right label conditionally */}
                     <span
                       className={cn(
-                        "text-[10px] font-semibold hidden md:inline",
+                        "text-xs font-semibold hidden md:inline",
                         pipelineRunning
                           ? "text-primary"
                           : "text-muted-foreground"
@@ -179,7 +179,7 @@ const Dashboard = () => {
                     {/* On smaller screens, show just one label based on state */}
                     <span
                       className={cn(
-                        "text-[10px] font-semibold md:hidden",
+                        "text-xs font-semibold md:hidden",
                         pipelineRunning
                           ? "text-primary"
                           : "text-muted-foreground"
@@ -196,10 +196,11 @@ const Dashboard = () => {
                   {pipelineStatuses.map((status) => (
                     <div
                       key={status}
+                      style={{ boxSizing: "border-box" }}
                       className={cn(
-                        "inline-flex items-center rounded-full px-3 py-1 text-[8px] font-semibold",
+                        "inline-flex items-center justify-center rounded-full px-3 py-1.5 text-xs font-semibold h-7 min-w-[60px]",
                         status === currentStatus
-                          ? "bg-black text-white"
+                          ? "bg-black text-white border border-transparent"
                           : "border border-muted bg-background text-muted-foreground"
                       )}
                     >
@@ -218,13 +219,16 @@ const Dashboard = () => {
                       type="button"
                       onClick={() => handleSignalClick(signal)}
                       disabled={!selectedPipeline || !pipelineRunning}
+                      style={{
+                        boxSizing: "border-box",
+                      }} /* Ensure border is included in size calc */
                       className={cn(
-                        "inline-flex items-center rounded-full px-3 py-1 text-[8px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                        "inline-flex items-center justify-center rounded-full px-3 py-1.5 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring h-7 min-w-[50px]",
                         !selectedPipeline || !pipelineRunning
                           ? "opacity-50 cursor-not-allowed"
                           : "cursor-pointer",
                         signal === selectedSignal
-                          ? "bg-primary text-primary-foreground hover:bg-primary/90"
+                          ? "bg-primary text-primary-foreground hover:bg-primary/90 border border-transparent"
                           : "border border-muted bg-background hover:bg-muted/80 text-muted-foreground"
                       )}
                     >
@@ -340,7 +344,7 @@ const Dashboard = () => {
                         {/* Show both labels on md screens and up */}
                         <span
                           className={cn(
-                            "text-[10px] font-semibold hidden md:inline",
+                            "text-xs font-semibold hidden md:inline",
                             pipelineRunning
                               ? "text-muted-foreground"
                               : "text-primary"
@@ -359,7 +363,7 @@ const Dashboard = () => {
                         {/* On larger screens, show the right label conditionally */}
                         <span
                           className={cn(
-                            "text-[10px] font-semibold hidden md:inline",
+                            "text-xs font-semibold hidden md:inline",
                             pipelineRunning
                               ? "text-primary"
                               : "text-muted-foreground"
@@ -371,7 +375,7 @@ const Dashboard = () => {
                         {/* On smaller screens, show just one label based on state */}
                         <span
                           className={cn(
-                            "text-[10px] font-semibold md:hidden",
+                            "text-xs font-semibold md:hidden",
                             pipelineRunning
                               ? "text-primary"
                               : "text-muted-foreground"
@@ -388,10 +392,11 @@ const Dashboard = () => {
                       {pipelineStatuses.map((status) => (
                         <div
                           key={status}
+                          style={{ boxSizing: "border-box" }}
                           className={cn(
-                            "inline-flex items-center rounded-full px-3 py-1 text-[8px] font-semibold",
+                            "inline-flex items-center justify-center rounded-full px-3 py-1.5 text-xs font-semibold h-7 min-w-[60px]",
                             status === currentStatus
-                              ? "bg-black text-white"
+                              ? "bg-black text-white border border-transparent"
                               : "border border-muted bg-background text-muted-foreground"
                           )}
                         >
@@ -410,13 +415,16 @@ const Dashboard = () => {
                           type="button"
                           onClick={() => handleSignalClick(signal)}
                           disabled={!selectedPipeline || !pipelineRunning}
+                          style={{
+                            boxSizing: "border-box",
+                          }} /* Ensure border is included in size calc */
                           className={cn(
-                            "inline-flex items-center rounded-full px-3 py-1 text-[8px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                            "inline-flex items-center justify-center rounded-full px-3 py-1.5 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring h-7 min-w-[50px]",
                             !selectedPipeline || !pipelineRunning
                               ? "opacity-50 cursor-not-allowed"
                               : "cursor-pointer",
                             signal === selectedSignal
-                              ? "bg-primary text-primary-foreground hover:bg-primary/90"
+                              ? "bg-primary text-primary-foreground hover:bg-primary/90 border border-transparent"
                               : "border border-muted bg-background hover:bg-muted/80 text-muted-foreground"
                           )}
                         >

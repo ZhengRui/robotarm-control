@@ -20,14 +20,23 @@ import {
 const VisualizationCard = () => {
   const [selectedPipeline] = useAtom(selectedPipelineAtom);
   const [pipelineRunning] = useAtom(pipelineRunningAtom);
-  const [selectedQueue, setSelectedQueue] = useAtom(selectedQueueAtom);
+  const [selectedQueues, setSelectedQueues] = useAtom(selectedQueueAtom);
   const [pipelineQueues] = useAtom(pipelineQueuesAtom);
 
-  // Handle queue selection
+  // Handle queue selection (now supports multi-select)
   const handleQueueClick = (queue: string) => {
-    setSelectedQueue(queue);
-    console.log("Queue selected:", queue);
-    // Here you would connect to the queue for visualization
+    setSelectedQueues((prev) => {
+      // If already selected, remove it
+      if (prev.includes(queue)) {
+        return prev.filter((q) => q !== queue);
+      }
+      // Otherwise add it to selection
+      return [...prev, queue];
+    });
+    console.log(
+      `Queue ${selectedQueues.includes(queue) ? "unselected" : "selected"}:`,
+      queue
+    );
   };
 
   return (
@@ -73,7 +82,17 @@ const VisualizationCard = () => {
       <CardContent className="px-5 py-3 flex flex-col h-[calc(100%-3rem)] overflow-y-auto">
         {/* Stream queues section */}
         <div className="mb-4">
-          <h3 className="text-sm font-semibold mb-2">Stream Queues</h3>
+          <div className="flex justify-between items-center mb-2">
+            <h3 className="text-sm font-semibold">Stream Queues</h3>
+            {selectedQueues.length > 0 && (
+              <button
+                onClick={() => setSelectedQueues([])}
+                className="text-xs text-muted-foreground hover:text-foreground"
+              >
+                Clear Selection
+              </button>
+            )}
+          </div>
           <div className="flex flex-wrap gap-2 mb-4">
             {pipelineQueues.map((queue) => (
               <button
@@ -81,13 +100,16 @@ const VisualizationCard = () => {
                 type="button"
                 onClick={() => handleQueueClick(queue)}
                 disabled={!selectedPipeline || !pipelineRunning}
+                style={{
+                  boxSizing: "border-box",
+                }} /* Ensure border is included in size calc */
                 className={cn(
-                  "inline-flex items-center rounded-full px-3 py-1 text-[8px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                  "inline-flex items-center justify-center rounded-full px-3 py-1.5 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring h-7 min-w-[60px]",
                   !selectedPipeline || !pipelineRunning
                     ? "opacity-50 cursor-not-allowed"
                     : "cursor-pointer",
-                  queue === selectedQueue
-                    ? "bg-primary text-primary-foreground hover:bg-primary/90"
+                  selectedQueues.includes(queue)
+                    ? "bg-primary text-primary-foreground hover:bg-primary/90 border border-transparent"
                     : "border border-muted bg-background hover:bg-muted/80 text-muted-foreground"
                 )}
               >
@@ -97,7 +119,20 @@ const VisualizationCard = () => {
           </div>
         </div>
 
-        <div className="flex-1 flex items-start justify-center"></div>
+        <div className="flex-1 flex items-start justify-center min-h-[100px]">
+          {selectedQueues.length > 0 ? (
+            <div className="w-full text-center text-sm text-muted-foreground h-8 mt-2">
+              <p className="line-clamp-2">
+                Visualizing {selectedQueues.length} queue(s):{" "}
+                {selectedQueues.join(", ")}
+              </p>
+            </div>
+          ) : (
+            <div className="w-full text-center text-sm text-muted-foreground h-8 mt-2">
+              <p>Select queues to visualize data</p>
+            </div>
+          )}
+        </div>
       </CardContent>
     </Card>
   );
