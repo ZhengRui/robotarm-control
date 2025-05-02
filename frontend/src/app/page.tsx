@@ -69,30 +69,6 @@ export default function Dashboard() {
     setIsLoading(false);
   }, []);
 
-  // Second effect for measurements that only runs when isLoading is false
-  // useLayoutEffect(() => {
-  //   if (isLoading) return; // Don't run if still loading
-
-  //   const panelGroup = document.querySelector(
-  //     '[data-panel-group-id="dashboard-layout-horizontal"]'
-  //   );
-
-  //   if (!panelGroup) return;
-
-  //   const observer = new ResizeObserver(() => {
-  //     const screenWidth = (panelGroup as HTMLElement).offsetWidth;
-
-  //     setMinSize((MIN_SIZE_IN_PIXELS / screenWidth) * 100);
-  //     setMaxSize((MAX_SIZE_IN_PIXELS / screenWidth) * 100);
-  //   });
-
-  //   observer.observe(panelGroup);
-
-  //   return () => {
-  //     observer.disconnect();
-  //   };
-  // }, [isLoading]); // This runs when isLoading changes to false
-
   // Handle toggle change for pipeline running state
   const handleToggleChange = (checked: boolean) => {
     setPipelineRunning(checked);
@@ -151,14 +127,35 @@ export default function Dashboard() {
           >
             {/* Pipeline Selection with integrated toggle */}
             <Panel defaultSize={30} minSize={20} className="flex flex-col">
-              <Card className="shadow-sm rounded-md p-0 flex-1 overflow-auto border-0 bg-gray-200">
-                <CardContent className="px-5 py-3 overflow-y-auto h-full">
-                  <div className="flex justify-between items-center mb-2">
-                    <h2 className="text-sm font-semibold">Select Pipeline</h2>
+              <Card className="shadow-sm rounded-md p-0 flex-1 overflow-auto border-0 bg-gray-200 gap-0">
+                <div className="sticky top-0 bg-gray-300 px-5 py-3 z-10 border-b border-gray-300/30 h-12 flex items-center">
+                  <div className="flex justify-between items-center gap-3 w-full">
+                    <Select
+                      onValueChange={(value) => {
+                        setSelectedPipeline(value);
+                      }}
+                      value={selectedPipeline ?? ""}
+                    >
+                      <SelectTrigger className="text-sm font-semibold !h-6 !focus:ring-0 !focus:ring-offset-0 shadow-none px-0 border-0 w-auto min-w-[80px]">
+                        <SelectValue placeholder="Select Pipeline" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {availablePipelines.map((pipeline) => (
+                          <SelectItem
+                            key={pipeline}
+                            value={pipeline}
+                            className="text-sm"
+                          >
+                            {pipeline}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                     <div className="flex items-center gap-2">
+                      {/* Show both labels on md screens and up */}
                       <span
                         className={cn(
-                          "text-[10px] font-semibold",
+                          "text-[10px] font-semibold hidden md:inline",
                           pipelineRunning
                             ? "text-muted-foreground"
                             : "text-primary"
@@ -174,9 +171,10 @@ export default function Dashboard() {
                         }}
                         id="pipeline-switch"
                       />
+                      {/* On larger screens, show the right label conditionally */}
                       <span
                         className={cn(
-                          "text-[10px] font-semibold",
+                          "text-[10px] font-semibold hidden md:inline",
                           pipelineRunning
                             ? "text-primary"
                             : "text-muted-foreground"
@@ -184,32 +182,22 @@ export default function Dashboard() {
                       >
                         On
                       </span>
+
+                      {/* On smaller screens, show just one label based on state */}
+                      <span
+                        className={cn(
+                          "text-[10px] font-semibold md:hidden",
+                          pipelineRunning
+                            ? "text-primary"
+                            : "text-muted-foreground"
+                        )}
+                      >
+                        {pipelineRunning ? "On" : "Off"}
+                      </span>
                     </div>
                   </div>
-                  <Select
-                    onValueChange={(value) => {
-                      setSelectedPipeline(value);
-                    }}
-                    value={selectedPipeline ?? ""}
-                  >
-                    <SelectTrigger className="text-[10px] font-semibold text-muted-foreground border bg-background !h-6 !focus:ring-0 !focus:ring-offset-0 w-full mb-4 rounded-sm">
-                      <SelectValue placeholder="Select a pipeline..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {availablePipelines.map((pipeline) => (
-                        <SelectItem
-                          key={pipeline}
-                          value={pipeline}
-                          className="text-xs"
-                        >
-                          {pipeline}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-
-                  <div className="h-px bg-gray-300/50 my-2"></div>
-
+                </div>
+                <CardContent className="px-5 py-3 overflow-y-auto h-full">
                   <h2 className="text-sm font-semibold mb-2">Status</h2>
                   <div className="flex flex-wrap gap-2 mb-4">
                     {pipelineStatuses.map((status) => (
@@ -262,10 +250,12 @@ export default function Dashboard() {
 
             {/* Configuration Area */}
             <Panel defaultSize={70} minSize={50} className="flex flex-col">
-              <Card className="shadow-sm rounded-md p-0 flex-1 overflow-auto border-0 bg-gray-200">
-                <CardContent className="px-5 py-3 h-full flex flex-col">
-                  <h2 className="text-sm font-semibold mb-2">Configuration</h2>
-                  <div className="flex-1 overflow-y-auto text-sm text-muted-foreground">
+              <Card className="shadow-sm rounded-md p-0 flex-1 overflow-auto border-0 bg-gray-200 gap-0">
+                <div className="sticky top-0 bg-gray-300 px-5 py-3 z-10 border-b border-gray-300/30 h-12 flex items-center">
+                  <h2 className="text-sm font-semibold">Configuration</h2>
+                </div>
+                <CardContent className="px-5 py-3 h-full flex flex-col overflow-y-auto">
+                  <div className="flex-1 text-sm text-muted-foreground">
                     {selectedPipeline ? (
                       <p>
                         Configuration options for {selectedPipeline} will appear
@@ -288,9 +278,9 @@ export default function Dashboard() {
 
         {/* Main Content */}
         <Panel className="p-.5 pt-3 pb-3 pr-3" order={2}>
-          <Card className="h-full shadow-sm rounded-md overflow-auto border-0 bg-gray-200 p-0">
-            <CardContent className="px-5 py-3 flex flex-col h-full">
-              <div className="flex justify-between items-start mb-4">
+          <Card className="h-full shadow-sm rounded-md overflow-auto border-0 bg-gray-200 p-0 gap-0">
+            <div className="sticky top-0 bg-gray-300 px-5 py-3 z-10 border-b border-gray-300/30 h-12 flex items-center">
+              <div className="flex justify-between items-center w-full">
                 <h3 className="text-sm font-semibold">Visualization</h3>
                 <div className="flex items-center gap-2">
                   {/* Icon buttons group */}
@@ -326,7 +316,8 @@ export default function Dashboard() {
                   </button>
                 </div>
               </div>
-
+            </div>
+            <CardContent className="px-5 py-3 flex flex-col h-full overflow-y-auto">
               {/* Stream queues section */}
               <div className="mb-4">
                 <h3 className="text-sm font-semibold mb-2">Stream Queues</h3>
