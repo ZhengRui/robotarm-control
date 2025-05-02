@@ -35,6 +35,9 @@ export default function Dashboard() {
   // Signal state to track selected signal
   const [selectedSignal, setSelectedSignal] = useState<string | null>(null);
 
+  // Queue state to track selected queue
+  const [selectedQueue, setSelectedQueue] = useState<string | null>(null);
+
   // Placeholder data - replace with actual API calls later
   const availablePipelines = ["YahboomPickAndPlace", "OtherPipeline"];
   const pipelineStatuses = [
@@ -45,6 +48,13 @@ export default function Dashboard() {
     "PLACING",
   ];
   const pipelineSignals = ["STOP", "PAUSE", "RESUME", "RESET", "CALIBRATE"];
+  const pipelineQueues = [
+    "CAMERA",
+    "PROCESS",
+    "DETECTION",
+    "ARM_STATE",
+    "ROBOT_CONTROL",
+  ];
 
   const MIN_SIZE_IN_PIXELS = 400;
   const MAX_SIZE_IN_PIXELS = 500;
@@ -96,6 +106,13 @@ export default function Dashboard() {
     // Here you would send the signal to the backend
   };
 
+  // Handle queue selection
+  const handleQueueClick = (queue: string) => {
+    setSelectedQueue(queue);
+    console.log("Queue selected:", queue);
+    // Here you would connect to the queue for visualization
+  };
+
   // If still loading, show a spinning loader using Lucide React
   if (isLoading) {
     return (
@@ -110,9 +127,12 @@ export default function Dashboard() {
 
   return (
     <div className="h-screen w-full bg-background transition-all duration-200">
+      <div className="flex justify-center py-4 border-b border-border/30">
+        <h1 className="text-2xl font-bold">Modulus Robot Control</h1>
+      </div>
       <PanelGroup
         direction="horizontal"
-        className="h-full"
+        className="h-[calc(100%-4rem)]"
         autoSaveId="dashboard-layout-horizontal"
         id="dashboard-layout-horizontal"
       >
@@ -124,10 +144,6 @@ export default function Dashboard() {
           className="p-.5 pl-3 pt-3 pb-3 flex flex-col overflow-hidden"
           order={1}
         >
-          <h1 className="text-2xl font-bold mb-4 w-full text-center">
-            Modulus Robot Control
-          </h1>
-
           <PanelGroup
             direction="vertical"
             className="flex-1"
@@ -192,10 +208,10 @@ export default function Dashboard() {
                     </SelectContent>
                   </Select>
 
-                  <div className="h-px bg-border/50 my-4"></div>
+                  <div className="h-px bg-gray-300/50 my-2"></div>
 
                   <h2 className="text-sm font-semibold mb-2">Status</h2>
-                  <div className="flex flex-wrap gap-2">
+                  <div className="flex flex-wrap gap-2 mb-4">
                     {pipelineStatuses.map((status) => (
                       <div
                         key={status}
@@ -211,10 +227,10 @@ export default function Dashboard() {
                     ))}
                   </div>
 
-                  <div className="h-px bg-border/50 my-4"></div>
+                  <div className="h-px bg-gray-300/50 my-2"></div>
 
                   <h2 className="text-sm font-semibold mb-2">Signals</h2>
-                  <div className="flex flex-wrap gap-2">
+                  <div className="flex flex-wrap gap-2 mb-4">
                     {pipelineSignals.map((signal) => (
                       <button
                         key={signal}
@@ -271,7 +287,7 @@ export default function Dashboard() {
         </PanelResizeHandle>
 
         {/* Main Content */}
-        <Panel className="p-.5 pt-15 pb-3 pr-3" order={2}>
+        <Panel className="p-.5 pt-3 pb-3 pr-3" order={2}>
           <Card className="h-full shadow-sm rounded-md overflow-auto border-0 bg-gray-200 p-0">
             <CardContent className="px-5 py-3 flex flex-col h-full">
               <div className="flex justify-between items-start mb-4">
@@ -310,22 +326,34 @@ export default function Dashboard() {
                   </button>
                 </div>
               </div>
-              <div className="flex-1 flex items-center justify-center">
-                <div className="text-center max-w-md">
-                  <p className="text-muted-foreground">
-                    {selectedPipeline
-                      ? `Select a queue from ${selectedPipeline} to visualize frames.`
-                      : "Select a pipeline and connect to a queue to see frames."}
-                  </p>
-                  {/* Debug section */}
-                  <div className="mt-4 p-4 bg-muted/10 rounded text-left text-xs">
-                    <p>Selected Pipeline: {selectedPipeline || "None"}</p>
-                    <p>Running: {pipelineRunning ? "Yes" : "No"}</p>
-                    <p>Current Status: {currentStatus}</p>
-                    <p>Selected Signal: {selectedSignal || "None"}</p>
-                  </div>
+
+              {/* Stream queues section */}
+              <div className="mb-4">
+                <h3 className="text-sm font-semibold mb-2">Stream Queues</h3>
+                <div className="flex flex-wrap gap-2 mb-4">
+                  {pipelineQueues.map((queue) => (
+                    <button
+                      key={queue}
+                      type="button"
+                      onClick={() => handleQueueClick(queue)}
+                      disabled={!selectedPipeline || !pipelineRunning}
+                      className={cn(
+                        "inline-flex items-center rounded-full px-3 py-1 text-[8px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                        !selectedPipeline || !pipelineRunning
+                          ? "opacity-50 cursor-not-allowed"
+                          : "cursor-pointer",
+                        queue === selectedQueue
+                          ? "bg-primary text-primary-foreground hover:bg-primary/90"
+                          : "border border-muted bg-background hover:bg-muted/80 text-muted-foreground"
+                      )}
+                    >
+                      {queue}
+                    </button>
+                  ))}
                 </div>
               </div>
+
+              <div className="flex-1 flex items-start justify-center"></div>
             </CardContent>
           </Card>
         </Panel>
