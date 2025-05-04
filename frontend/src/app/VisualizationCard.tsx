@@ -76,7 +76,7 @@ const VisualizationCard = () => {
             <MultiSelect
               label="Stream Queues"
               selectedValues={selectedQueues}
-              options={pipelineQueues}
+              options={selectedPipeline ? pipelineQueues : []}
               onChange={handleQueueSelection}
               disabled={!selectedPipeline || !pipelineRunning}
               placeholder="Select queues"
@@ -102,16 +102,22 @@ const VisualizationCard = () => {
         </div>
 
         <div className="flex-1 flex items-start justify-center min-h-[100px]">
-          {selectedQueues.length > 0 ? (
-            <div className="w-full text-center text-sm text-muted-foreground h-8 mt-2">
-              <p className="line-clamp-2">
-                Visualizing {selectedQueues.length} queue(s):{" "}
-                {selectedQueues.join(", ")}
-              </p>
-            </div>
+          {selectedPipeline ? (
+            selectedQueues.length > 0 ? (
+              <div className="w-full text-center text-sm text-muted-foreground h-8 mt-2">
+                <p className="line-clamp-2">
+                  Visualizing {selectedQueues.length} queue(s):{" "}
+                  {selectedQueues.join(", ")}
+                </p>
+              </div>
+            ) : (
+              <div className="w-full text-center text-sm text-muted-foreground h-8 mt-2">
+                <p>Select queues to visualize data</p>
+              </div>
+            )
           ) : (
             <div className="w-full text-center text-sm text-muted-foreground h-8 mt-2">
-              <p>Select queues to visualize data</p>
+              <p>Select a pipeline first to enable visualization</p>
             </div>
           )}
         </div>

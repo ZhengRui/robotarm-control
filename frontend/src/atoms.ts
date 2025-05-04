@@ -1,7 +1,7 @@
 import { atom } from "jotai";
 
 // Pipeline state atoms
-export const selectedPipelineAtom = atom<string | null>("YahboomPickAndPlace");
+export const selectedPipelineAtom = atom<string | null>(null);
 export const pipelineRunningAtom = atom<boolean>(false);
 export const currentStatusAtom = atom<string>("PICKING");
 

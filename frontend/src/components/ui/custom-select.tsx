@@ -16,6 +16,7 @@ interface BaseSelectProps {
 interface ReadOnlySelectProps extends BaseSelectProps {
   value: string;
   options: string[];
+  placeholder?: string;
 }
 
 export const ReadOnlySelect = ({
@@ -26,6 +27,7 @@ export const ReadOnlySelect = ({
   className,
   width = "120px",
   maxHeight = "160px",
+  placeholder = "",
 }: ReadOnlySelectProps) => {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -56,12 +58,12 @@ export const ReadOnlySelect = ({
         style={{ boxSizing: "border-box", width }}
         className={cn(
           "inline-flex items-center justify-between rounded-md px-3 py-1.5 text-xs font-semibold h-7",
-          "bg-black text-white border border-transparent",
-          isOpen ? "ring-2 ring-primary/20" : "",
+          "bg-black text-white border border-transparent outline-none focus:outline-none",
+          isOpen ? "" : "",
           disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"
         )}
       >
-        <span className="truncate">{value}</span>
+        <span className="truncate">{value || placeholder}</span>
         <ChevronDown
           className={cn(
             "ml-1 size-3 transition-transform",
@@ -72,7 +74,7 @@ export const ReadOnlySelect = ({
 
       {isOpen && !disabled && (
         <div
-          className="absolute right-0 mt-1 z-10 bg-white rounded-md shadow-lg border border-gray-200 py-1 overflow-y-auto"
+          className="absolute right-0 mt-1 z-50 bg-white rounded-md shadow-lg border border-gray-200 py-1 overflow-y-auto"
           style={{ width, maxHeight }}
         >
           {label && (
@@ -160,14 +162,14 @@ export const MultiSelect = ({
         style={{ boxSizing: "border-box", width }}
         className={cn(
           "inline-flex items-center justify-between rounded-md px-3 py-1.5 text-xs font-semibold h-7",
-          "border border-input bg-background",
-          isOpen ? "ring-2 ring-primary/20" : "",
+          "border border-input bg-background outline-none focus:outline-none",
+          isOpen ? "" : "",
           disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"
         )}
       >
         <span className="truncate">
           {selectedValues.length > 0
-            ? `${selectedValues.length} item${selectedValues.length > 1 ? "s" : ""} selected`
+            ? `${selectedValues.length} queue${selectedValues.length > 1 ? "s" : ""} selected`
             : placeholder}
         </span>
         <ChevronDown
@@ -180,7 +182,7 @@ export const MultiSelect = ({
 
       {isOpen && !disabled && (
         <div
-          className="absolute right-0 mt-1 z-10 bg-white rounded-md shadow-lg border border-gray-200 py-1 overflow-y-auto"
+          className="absolute right-0 mt-1 z-50 bg-white rounded-md shadow-lg border border-gray-200 py-1 overflow-y-auto"
           style={{ width: parseInt(width) + 40 + "px", maxHeight }}
         >
           <div className="px-3 py-1 border-b border-gray-100">

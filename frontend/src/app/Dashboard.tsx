@@ -8,6 +8,8 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
+  SelectLabel,
+  SelectGroup,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
@@ -128,21 +130,42 @@ const Dashboard = () => {
                     onValueChange={(value) => {
                       setSelectedPipeline(value);
                     }}
-                    value={selectedPipeline ?? ""}
+                    value={selectedPipeline || ""}
+                    defaultValue=""
+                    onOpenChange={() => {
+                      // Reset any potential selection/highlight when opening
+                      if (!selectedPipeline) {
+                        setTimeout(() => {
+                          const activeElement =
+                            document.activeElement as HTMLElement;
+                          if (activeElement) {
+                            activeElement.blur();
+                          }
+                        }, 0);
+                      }
+                    }}
                   >
-                    <SelectTrigger className="text-sm font-semibold !h-6 !focus:ring-0 !focus:ring-offset-0 shadow-none px-0 border-0 w-auto min-w-[80px]">
+                    <SelectTrigger className="text-sm font-semibold !h-6 !focus:ring-0 !focus:ring-offset-0 !focus-visible:ring-0 !focus-visible:ring-offset-0 !ring-0 !ring-offset-0 shadow-none px-0 border-0 w-auto min-w-[150px] text-left outline-none focus:outline-none">
                       <SelectValue placeholder="Select Pipeline" />
                     </SelectTrigger>
-                    <SelectContent>
-                      {availablePipelines.map((pipeline) => (
-                        <SelectItem
-                          key={pipeline}
-                          value={pipeline}
-                          className="text-sm"
-                        >
-                          {pipeline}
-                        </SelectItem>
-                      ))}
+                    <SelectContent
+                      className="rounded-md overflow-hidden"
+                      align="start"
+                    >
+                      <SelectGroup>
+                        <SelectLabel className="px-3 py-1 border-b border-gray-100 text-xs font-semibold text-left">
+                          Select Pipeline
+                        </SelectLabel>
+                        {availablePipelines.map((pipeline) => (
+                          <SelectItem
+                            key={pipeline}
+                            value={pipeline}
+                            className="text-sm rounded-none hover:bg-gray-100 text-left pl-3 data-[highlighted]:bg-accent data-[highlighted]:text-accent-foreground data-[state=checked]:bg-transparent data-[state=checked]:text-foreground !focus:bg-transparent !outline-none"
+                          >
+                            {pipeline}
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
                     </SelectContent>
                   </Select>
                   <div className="flex items-center gap-2">
@@ -163,7 +186,8 @@ const Dashboard = () => {
                         console.log("Switch clicked, new value:", checked);
                         handleToggleChange(checked);
                       }}
-                      id="pipeline-switch"
+                      id="pipeline-switch-mobile"
+                      disabled={!selectedPipeline}
                     />
                     {/* On larger screens, show the right label conditionally */}
                     <span
@@ -196,10 +220,12 @@ const Dashboard = () => {
                   <h2 className="text-sm font-semibold">Status</h2>
                   <div className="flex items-center">
                     <ReadOnlySelect
-                      value={currentStatus}
-                      options={pipelineStatuses}
+                      value={selectedPipeline ? currentStatus : ""}
+                      options={selectedPipeline ? pipelineStatuses : []}
                       label="Status"
                       width="120px"
+                      placeholder="Select Pipeline First"
+                      disabled={!selectedPipeline}
                     />
                   </div>
                 </div>
@@ -208,28 +234,34 @@ const Dashboard = () => {
 
                 <h2 className="text-sm font-semibold mb-2">Signals</h2>
                 <div className="flex flex-wrap gap-2 mb-4">
-                  {pipelineSignals.map((signal) => (
-                    <button
-                      key={signal}
-                      type="button"
-                      onClick={() => handleSignalClick(signal)}
-                      disabled={!selectedPipeline || !pipelineRunning}
-                      style={{
-                        boxSizing: "border-box",
-                      }} /* Ensure border is included in size calc */
-                      className={cn(
-                        "inline-flex items-center justify-center rounded-full px-3 py-1.5 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring h-7 min-w-[50px]",
-                        !selectedPipeline || !pipelineRunning
-                          ? "opacity-50 cursor-not-allowed"
-                          : "cursor-pointer",
-                        signal === selectedSignal
-                          ? "bg-primary text-primary-foreground hover:bg-primary/90 border border-transparent"
-                          : "border border-muted bg-background hover:bg-muted/80 text-muted-foreground"
-                      )}
-                    >
-                      {signal}
-                    </button>
-                  ))}
+                  {selectedPipeline ? (
+                    pipelineSignals.map((signal) => (
+                      <button
+                        key={signal}
+                        type="button"
+                        onClick={() => handleSignalClick(signal)}
+                        disabled={!selectedPipeline || !pipelineRunning}
+                        style={{
+                          boxSizing: "border-box",
+                        }}
+                        className={cn(
+                          "inline-flex items-center justify-center rounded-full px-3 py-1.5 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring h-7 min-w-[50px]",
+                          !selectedPipeline || !pipelineRunning
+                            ? "opacity-50 cursor-not-allowed"
+                            : "cursor-pointer",
+                          signal === selectedSignal
+                            ? "bg-primary text-primary-foreground hover:bg-primary/90 border border-transparent"
+                            : "border border-muted bg-background hover:bg-muted/80 text-muted-foreground"
+                        )}
+                      >
+                        {signal}
+                      </button>
+                    ))
+                  ) : (
+                    <p className="text-sm text-muted-foreground">
+                      Select a pipeline to view available signals
+                    </p>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -318,21 +350,42 @@ const Dashboard = () => {
                         onValueChange={(value) => {
                           setSelectedPipeline(value);
                         }}
-                        value={selectedPipeline ?? ""}
+                        value={selectedPipeline || ""}
+                        defaultValue=""
+                        onOpenChange={() => {
+                          // Reset any potential selection/highlight when opening
+                          if (!selectedPipeline) {
+                            setTimeout(() => {
+                              const activeElement =
+                                document.activeElement as HTMLElement;
+                              if (activeElement) {
+                                activeElement.blur();
+                              }
+                            }, 0);
+                          }
+                        }}
                       >
-                        <SelectTrigger className="text-sm font-semibold !h-6 !focus:ring-0 !focus:ring-offset-0 shadow-none px-0 border-0 w-auto min-w-[80px]">
+                        <SelectTrigger className="text-sm font-semibold !h-6 !focus:ring-0 !focus:ring-offset-0 !focus-visible:ring-0 !focus-visible:ring-offset-0 !ring-0 !ring-offset-0 shadow-none px-0 border-0 w-auto min-w-[150px] text-left outline-none focus:outline-none">
                           <SelectValue placeholder="Select Pipeline" />
                         </SelectTrigger>
-                        <SelectContent>
-                          {availablePipelines.map((pipeline) => (
-                            <SelectItem
-                              key={pipeline}
-                              value={pipeline}
-                              className="text-sm"
-                            >
-                              {pipeline}
-                            </SelectItem>
-                          ))}
+                        <SelectContent
+                          className="rounded-md overflow-hidden"
+                          align="start"
+                        >
+                          <SelectGroup>
+                            <SelectLabel className="px-3 py-1 border-b border-gray-100 text-xs font-semibold text-left">
+                              Select Pipeline
+                            </SelectLabel>
+                            {availablePipelines.map((pipeline) => (
+                              <SelectItem
+                                key={pipeline}
+                                value={pipeline}
+                                className="text-sm rounded-none hover:bg-gray-100 text-left pl-3 data-[highlighted]:bg-accent data-[highlighted]:text-accent-foreground data-[state=checked]:bg-transparent data-[state=checked]:text-foreground !focus:bg-transparent !outline-none"
+                              >
+                                {pipeline}
+                              </SelectItem>
+                            ))}
+                          </SelectGroup>
                         </SelectContent>
                       </Select>
                       <div className="flex items-center gap-2">
@@ -354,6 +407,7 @@ const Dashboard = () => {
                             handleToggleChange(checked);
                           }}
                           id="pipeline-switch"
+                          disabled={!selectedPipeline}
                         />
                         {/* On larger screens, show the right label conditionally */}
                         <span
@@ -386,10 +440,12 @@ const Dashboard = () => {
                       <h2 className="text-sm font-semibold">Status</h2>
                       <div className="flex items-center">
                         <ReadOnlySelect
-                          value={currentStatus}
-                          options={pipelineStatuses}
+                          value={selectedPipeline ? currentStatus : ""}
+                          options={selectedPipeline ? pipelineStatuses : []}
                           label="Status"
                           width="120px"
+                          placeholder="Select Pipeline First"
+                          disabled={!selectedPipeline}
                         />
                       </div>
                     </div>
@@ -398,28 +454,34 @@ const Dashboard = () => {
 
                     <h2 className="text-sm font-semibold mb-2">Signals</h2>
                     <div className="flex flex-wrap gap-2 mb-4">
-                      {pipelineSignals.map((signal) => (
-                        <button
-                          key={signal}
-                          type="button"
-                          onClick={() => handleSignalClick(signal)}
-                          disabled={!selectedPipeline || !pipelineRunning}
-                          style={{
-                            boxSizing: "border-box",
-                          }} /* Ensure border is included in size calc */
-                          className={cn(
-                            "inline-flex items-center justify-center rounded-full px-3 py-1.5 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring h-7 min-w-[50px]",
-                            !selectedPipeline || !pipelineRunning
-                              ? "opacity-50 cursor-not-allowed"
-                              : "cursor-pointer",
-                            signal === selectedSignal
-                              ? "bg-primary text-primary-foreground hover:bg-primary/90 border border-transparent"
-                              : "border border-muted bg-background hover:bg-muted/80 text-muted-foreground"
-                          )}
-                        >
-                          {signal}
-                        </button>
-                      ))}
+                      {selectedPipeline ? (
+                        pipelineSignals.map((signal) => (
+                          <button
+                            key={signal}
+                            type="button"
+                            onClick={() => handleSignalClick(signal)}
+                            disabled={!selectedPipeline || !pipelineRunning}
+                            style={{
+                              boxSizing: "border-box",
+                            }}
+                            className={cn(
+                              "inline-flex items-center justify-center rounded-full px-3 py-1.5 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring h-7 min-w-[50px]",
+                              !selectedPipeline || !pipelineRunning
+                                ? "opacity-50 cursor-not-allowed"
+                                : "cursor-pointer",
+                              signal === selectedSignal
+                                ? "bg-primary text-primary-foreground hover:bg-primary/90 border border-transparent"
+                                : "border border-muted bg-background hover:bg-muted/80 text-muted-foreground"
+                            )}
+                          >
+                            {signal}
+                          </button>
+                        ))
+                      ) : (
+                        <p className="text-sm text-muted-foreground">
+                          Select a pipeline to view available signals
+                        </p>
+                      )}
                     </div>
                   </CardContent>
                 </Card>
