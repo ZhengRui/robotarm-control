@@ -57,6 +57,11 @@ A modular system for controlling robot arms with computer vision integration. Th
    uv sync
    ```
 
+   For users in China or experiencing network issues:
+   ```bash
+   uv sync --index-url https://pypi.tuna.tsinghua.edu.cn/simple
+   ```
+
 ### Robot Arm Setup
 
 1. Connect the Yahboom MyCobot 280 to your computer via USB
