@@ -56,6 +56,10 @@
    ```bash
    uv sync
    ```
+对于中国用户或遇到网络问题的用户：
+   ```bash
+   uv sync --index-url https://pypi.tuna.tsinghua.edu.cn/simple
+   ```
 
 ### 机器人手臂设置
 
