@@ -1,11 +1,13 @@
 yahboom_pick_and_place:
+  redis:
+    host: "127.0.0.1"
+    port: 6379
+    db: 0
+    password: null
+
   dataloader:
     init:
       name: "redis"
-      host: "127.0.0.1"
-      port: 6379
-      db: 0
-      password: null
     process:
       queue: "camera_frames"
       wait: true

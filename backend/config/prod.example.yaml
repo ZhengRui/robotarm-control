@@ -1,12 +1,13 @@
 # Example production configuration
 # Rename to prod.yaml to use
 yahboom_pick_and_place:
+  redis:
+    host: "redis-server"  # Production Redis server
+    port: 6379
+    db: 0
+    password: "your-strong-password"  # Use strong password in production
+
   dataloader:
-    init:
-      host: "redis-server"  # Production Redis server
-      port: 6379
-      db: 0
-      password: "your-strong-password"  # Use strong password in production
     process:
       queue: "camera_frames"
       wait: true

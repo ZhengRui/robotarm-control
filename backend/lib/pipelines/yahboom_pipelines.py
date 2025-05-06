@@ -1,3 +1,4 @@
+import base64
 import time
 from enum import Enum
 from typing import Any, Dict, List, Optional
@@ -28,6 +29,15 @@ class PipelineSignal(Enum):
     CALIBRATION_CONFIRMED = "calibration_confirmed"
     START_PICK_PLACE = "start_pick_place"
     STOP = "stop"
+
+
+class PipelineQueue(Enum):
+    """Enum representing the different visualization purposed queues of the pipeline."""
+
+    INPUT_FRAMES = "input_frames"
+    CALIBRATION_FRAMES = "calibration_frames"
+    PT_FRAMES = "pt_frames"
+    DETECTION_FRAMES = "detection_frames"
 
 
 class YahboomPickAndPlacePipeline(BasePipeline):
@@ -100,7 +110,7 @@ class YahboomPickAndPlacePipeline(BasePipeline):
         Returns:
             List of queue names that this pipeline uses
         """
-        return ["camera_frames", "detection_results"]
+        return [queue.value for queue in PipelineQueue]
 
     @classmethod
     def get_config_schema(cls) -> Dict[str, Any]:
@@ -119,6 +129,13 @@ class YahboomPickAndPlacePipeline(BasePipeline):
             Current state as a string
         """
         return self.state.value
+
+    def _encode_frame(self, frame: np.ndarray) -> str:
+        """Encode frame as base64 JPEG for transmission."""
+        success, buffer = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 85])
+        if not success:
+            return ""
+        return base64.b64encode(buffer.tobytes()).decode("utf-8")
 
     def handle_signal(self, signal: str) -> None:
         """Handle user signals for state transitions.
@@ -195,10 +212,21 @@ class YahboomPickAndPlacePipeline(BasePipeline):
             if result and "frame" in result:
                 self.current_frame = result["frame"]
 
+                if self.current_frame is None:
+                    return
+
+                self.publish_to_queue(
+                    PipelineQueue.INPUT_FRAMES.value, {"frame": self._encode_frame(self.current_frame)}
+                )
+
                 # Update perspective transformed frame if we have a transformation matrix
-                if self.pt_matrix is not None and self.current_frame is not None:
+                if self.pt_matrix is not None:
                     h, w = self.current_frame.shape[:2]
                     self.current_pt_frame = cv2.warpPerspective(self.current_frame, self.pt_matrix, (w, h))
+
+                    self.publish_to_queue(
+                        PipelineQueue.PT_FRAMES.value, {"frame": self._encode_frame(self.current_pt_frame)}
+                    )
             else:
                 logger.warning("DataLoader did not return a valid frame")
         except Exception as e:
@@ -221,12 +249,13 @@ class YahboomPickAndPlacePipeline(BasePipeline):
             # Store the perspective transformation matrix
             if result and "pt_matrix" in result:
                 self.pt_matrix = result["pt_matrix"]
-                if self.pt_matrix is not None and self.current_frame is not None:
-                    h, w = self.current_frame.shape[:2]
-                    self.current_pt_frame = cv2.warpPerspective(self.current_frame, self.pt_matrix, (w, h))
-                    logger.info("Perspective transformation matrix applied successfully")
-                else:
-                    logger.warning("Failed to apply perspective transformation matrix")
+
+                self.publish_to_queue(
+                    PipelineQueue.CALIBRATION_FRAMES.value, {"frame": self._encode_frame(result["processed_frame"])}
+                )
+            else:
+                logger.warning("Failed to get perspective transformation matrix")
+
         except Exception as e:
             logger.error(f"Error in calibration processing: {e}")
 
@@ -272,4 +301,5 @@ class YahboomPickAndPlacePipeline(BasePipeline):
             # Process objects with arm control handler
             self.handlers["armcontrol"].process(self.detected_objects, debug=self.debug, **process_params)
         except Exception as e:
+            logger.error(f"Error in pick and place operation: {e}")
             logger.error(f"Error in pick and place operation: {e}")

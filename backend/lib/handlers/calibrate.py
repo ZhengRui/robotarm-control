@@ -97,4 +97,4 @@ class YahboomCalibrateHandler:
             cv2.imshow("PerspectiveTransform", perspective_img)  # Show the result (transformed or black)
             cv2.waitKey(10)
 
-        return {"pt_matrix": matrix if succeed else None}
+        return {"pt_matrix": matrix if succeed else None, "processed_frame": im}

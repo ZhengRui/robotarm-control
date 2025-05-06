@@ -8,9 +8,8 @@ from lib.pipelines import PipelineFactory, SignalPriority
 from lib.utils.logger import get_logger
 
 from ..config import config
-
-# from ..utils.websocket import manager
-# from .ws_routes import router as websocket_router
+from ..utils.websocket import manager
+from .ws_routes import router as websocket_router
 
 # Initialize logger
 logger = get_logger("api")
@@ -19,7 +18,7 @@ logger = get_logger("api")
 app = FastAPI(title="Robot Arm Control API", description="API for controlling the robot arm pipeline")
 
 # Include WebSocket routes
-# app.include_router(websocket_router)
+app.include_router(websocket_router)
 
 # Get initial pipeline settings from environment variables
 initial_pipeline = os.environ.get("PIPELINE")
@@ -31,13 +30,6 @@ class SignalRequest(BaseModel):
 
     signal: str
     priority: SignalPriority = SignalPriority.NORMAL
-
-
-# class ConfigUpdateRequest(BaseModel):
-#     """Configuration update request model."""
-#     __root__: Dict[str, Any] = Field(
-#         ..., description="Pipeline configuration updates"
-#     )
 
 
 @app.get("/pipelines")
@@ -130,6 +122,9 @@ async def stop_pipeline(pipeline_name: str):
     if not success:
         raise HTTPException(status_code=500, detail=f"Failed to stop pipeline '{pipeline_name}'")
 
+    # Close all connections for the pipeline
+    # await manager.close_pipeline_connections(pipeline_name)
+
     return {
         "status": "success",
         "pipeline": pipeline_name,
@@ -193,7 +188,7 @@ async def startup_event():
     logger.info("API server starting")
 
     # Start WebSocket manager background tasks
-    # manager.start_background_tasks()
+    await manager.start_background_tasks()
 
     # Start initial pipeline if specified in environment variables
     if initial_pipeline:
@@ -217,7 +212,7 @@ async def shutdown_event():
     logger.info("API server shutting down, cleaning up resources")
 
     # Clean up WebSocket connections
-    # manager.cleanup()
+    await manager.cleanup()
 
     # Clean up pipeline resources
     PipelineFactory.cleanup()

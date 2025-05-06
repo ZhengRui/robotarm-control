@@ -5,6 +5,7 @@ description = "Modulus robotarm control"
 readme = "README.md"
 requires-python = ">=3.8.10"
 dependencies = [
+    "aioredis>=2.0.1",
     "deepmerge>=2.0",
     "dotenv>=0.9.9",
     "fastapi",
@@ -12,6 +13,7 @@ dependencies = [
     "pymycobot>=3.9.7",
     "redis[hiredis]>=5.2.1",
     "uvicorn>=0.33.0",
+    "websockets>=13.1",
 ]
 
 [dependency-groups]

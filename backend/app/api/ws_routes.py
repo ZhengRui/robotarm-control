@@ -1,9 +1,4 @@
-from fastapi import (
-    APIRouter,
-    Path,
-    WebSocket,
-    WebSocketDisconnect,
-)
+from fastapi import APIRouter, Query, WebSocket, WebSocketDisconnect
 
 from lib.pipelines import PipelineFactory
 from lib.utils.logger import get_logger
@@ -17,10 +12,10 @@ logger = get_logger("websocket_routes")
 router = APIRouter(prefix="/ws", tags=["websocket"])
 
 
-@router.websocket("/pipeline/{pipeline_name}")
+@router.websocket("/pipeline")
 async def pipeline_websocket(
     websocket: WebSocket,
-    pipeline_name: str = Path(..., description="Name of the pipeline to monitor"),
+    pipeline_name: str = Query(..., description="Name of the pipeline to monitor"),
 ):
     """WebSocket endpoint for real-time pipeline status updates.
 
@@ -65,11 +60,11 @@ async def pipeline_websocket(
             pass
 
 
-@router.websocket("/pipeline/{pipeline_name}/queue/{queue_name}")
+@router.websocket("/queue")
 async def queue_websocket(
     websocket: WebSocket,
-    pipeline_name: str = Path(..., description="Name of the pipeline"),
-    queue_name: str = Path(..., description="Name of the queue to stream"),
+    pipeline_name: str = Query(..., description="Name of the pipeline"),
+    queue_name: str = Query(..., description="Name of the queue to stream"),
 ):
     """WebSocket endpoint for streaming queue data.
 

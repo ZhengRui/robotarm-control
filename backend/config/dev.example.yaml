@@ -1,12 +1,13 @@
 # Example development configuration
 # Rename to dev.yaml to use
 yahboom_pick_and_place:
+  redis:
+    host: "127.0.0.1"
+    port: 6379
+    db: 0
+    password: null
+
   dataloader:
-    init:
-      host: "127.0.0.1"
-      port: 6379
-      db: 0
-      password: null  # No password for development
     process:
       queue: "camera_frames"
       wait: true

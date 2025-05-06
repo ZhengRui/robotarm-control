@@ -1,4 +1,6 @@
+import json
 import os
+import time
 from abc import ABC, abstractmethod
 from typing import Any, Dict, List, Optional
 
@@ -55,6 +57,9 @@ class BasePipeline(ABC):
         # Merge with override config if provided
         if config_override:
             self._merge_config(config_override)
+
+        # Initialize Redis client for queue publishing
+        self.redis = self._initialize_redis_client()
 
         # Initialize handlers
         self.handlers = self._initialize_handlers()
@@ -164,12 +169,17 @@ class BasePipeline(ABC):
         # Initialize handlers based on config keys
         for handler_type, handler_config in self.config.items():
             # Skip non-handler configuration sections
-            if not isinstance(handler_config, dict):
+            if not isinstance(handler_config, dict) or handler_type == "redis":
                 continue
 
             try:
                 # Extract initialization parameters from the 'init' section if it exists
-                init_params = handler_config.get("init", {})
+                init_params = handler_config.get("init", {}).copy()
+
+                if handler_type == "dataloader":
+                    redis_config = self.config.get("redis", {})
+                    if redis_config:
+                        init_params.update(redis_config)
 
                 # Create the handler with initialization parameters
                 handlers[handler_type] = HandlerFactory.create_handler(handler_type=handler_type, config=init_params)
@@ -182,6 +192,66 @@ class BasePipeline(ABC):
                 raise RuntimeError(error_msg)
 
         return handlers
+
+    def _initialize_redis_client(self) -> Optional[Any]:
+        """Initialize Redis client for queue publishing.
+
+        Returns:
+            Redis client instance or None if initialization fails
+        """
+        redis_config = self.config.get("redis", {})
+        if not redis_config:
+            logger.info(f"No Redis configuration found for pipeline '{self.pipeline_name}', queue publishing disabled")
+            return None
+
+        try:
+            import redis
+
+            client = redis.Redis(
+                host=redis_config.get("host", "localhost"),
+                port=redis_config.get("port", 6379),
+                db=redis_config.get("db", 0),
+                password=redis_config.get("password", None),
+                decode_responses=redis_config.get("decode_responses", False),
+            )
+            # Test connection
+            client.ping()
+            logger.info(f"Redis connection established for pipeline '{self.pipeline_name}'")
+            return client
+        except ImportError:
+            logger.warning("Redis package not installed, queue publishing disabled")
+            return None
+        except Exception as e:
+            logger.error(f"Failed to initialize Redis client: {e}")
+            return None
+
+    def publish_to_queue(self, queue_name: str, data: Dict[str, Any]) -> bool:
+        """Publish data to a named queue via Redis.
+
+        Args:
+            queue_name: Name of the queue
+            data: Data to publish
+
+        Returns:
+            True if published successfully, False otherwise
+        """
+        if not self.redis:
+            return False
+
+        try:
+            channel = f"pipeline:{self.pipeline_name}:queue:{queue_name}"
+
+            # Add a timestamp if not present
+            if "timestamp" not in data:
+                data["timestamp"] = time.time()
+
+            # JSON encode the data and publish
+            self.redis.publish(channel, json.dumps(data))
+
+            return True
+        except Exception as e:
+            logger.error(f"Failed to publish to queue '{queue_name}': {e}")
+            return False
 
     @abstractmethod
     def handle_signal(self, signal: str) -> None:
