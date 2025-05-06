@@ -87,7 +87,7 @@ export const ReadOnlySelect = ({
             <div
               key={option}
               className={cn(
-                "px-3 py-1.5 text-xs cursor-default",
+                "px-3 py-1.5 text-xs cursor-not-allowed",
                 option === value
                   ? "bg-primary/10 font-semibold text-primary"
                   : "hover:bg-gray-100 text-gray-400"
@@ -142,6 +142,8 @@ export const MultiSelect = ({
   }, []);
 
   const handleToggleItem = (item: string) => {
+    if (disabled) return;
+
     if (selectedValues.includes(item)) {
       onChange(selectedValues.filter((i) => i !== item));
     } else {
@@ -150,6 +152,7 @@ export const MultiSelect = ({
   };
 
   const handleClearAll = () => {
+    if (disabled) return;
     onChange([]);
   };
 
@@ -157,14 +160,13 @@ export const MultiSelect = ({
     <div className={cn("relative", className)} ref={dropdownRef}>
       <button
         type="button"
-        onClick={() => !disabled && setIsOpen(!isOpen)}
-        disabled={disabled}
+        onClick={() => setIsOpen(!isOpen)}
         style={{ boxSizing: "border-box", width }}
         className={cn(
           "inline-flex items-center justify-between rounded-md px-3 py-1.5 text-xs font-semibold h-7",
-          "border border-input bg-background outline-none focus:outline-none",
-          isOpen ? "" : "",
-          disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"
+          "border border-input bg-background outline-none focus:outline-none cursor-pointer",
+          // isOpen ? "" : "",
+          disabled ? "opacity-50" : ""
         )}
       >
         <span className="truncate">
@@ -180,7 +182,7 @@ export const MultiSelect = ({
         />
       </button>
 
-      {isOpen && !disabled && (
+      {isOpen && (
         <div
           className="absolute right-0 mt-1 z-50 bg-white rounded-md shadow-lg border border-gray-200 py-1 overflow-y-auto"
           style={{ width: parseInt(width) + 40 + "px", maxHeight }}
@@ -188,7 +190,7 @@ export const MultiSelect = ({
           <div className="px-3 py-1 border-b border-gray-100">
             <div className="flex justify-between items-center">
               <span className="text-xs font-semibold">{label}</span>
-              {selectedValues.length > 0 && (
+              {selectedValues.length > 0 && !disabled && (
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
@@ -207,7 +209,11 @@ export const MultiSelect = ({
               key={item}
               onClick={() => handleToggleItem(item)}
               className={cn(
-                "px-3 py-1.5 text-xs cursor-pointer flex items-center justify-between",
+                "px-3 py-1.5 text-xs",
+                disabled
+                  ? "cursor-not-allowed text-gray-400"
+                  : "cursor-pointer",
+                "flex items-center justify-between",
                 selectedValues.includes(item)
                   ? "bg-primary/5"
                   : "hover:bg-gray-100 text-gray-600"

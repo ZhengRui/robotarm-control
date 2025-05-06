@@ -1,43 +1,10 @@
 import { atom } from "jotai";
+import { Pipeline } from "./interfaces";
 
-// Pipeline state atoms
-export const selectedPipelineAtom = atom<string | null>(null);
-export const pipelineRunningAtom = atom<boolean>(false);
-export const currentStatusAtom = atom<string>("PICKING");
-
-// Signal and queue state atoms
+// Core atoms - minimal set needed
+export const pipelinesAtom = atom<Pipeline[]>([]);
+export const selectedPipelineNameAtom = atom<string | null>(null);
 export const selectedSignalAtom = atom<string | null>(null);
-export const selectedQueueAtom = atom<string[]>([]);
 
-// Data atoms
-export const availablePipelinesAtom = atom<string[]>([
-  "YahboomPickAndPlace",
-  "OtherPipeline",
-]);
-
-export const pipelineStatusesAtom = atom<string[]>([
-  "IDLE",
-  "RUNNING",
-  "CALIBRATING",
-  "PICKING",
-  "PLACING",
-]);
-
-export const pipelineSignalsAtom = atom<string[]>([
-  "STOP",
-  "PAUSE",
-  "RESUME",
-  "RESET",
-  "CALIBRATE",
-]);
-
-export const pipelineQueuesAtom = atom<string[]>([
-  "CAMERA",
-  "PROCESS",
-  "DETECTION",
-  "ARM_STATE",
-  "ROBOT_CONTROL",
-]);
-
-// Layout state atoms
+// UI state
 export const isMobileAtom = atom<boolean>(false);

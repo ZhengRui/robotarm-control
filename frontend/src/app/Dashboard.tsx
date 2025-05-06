@@ -17,43 +17,66 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels";
 import { Loader2 } from "lucide-react";
 import {
-  selectedPipelineAtom,
-  pipelineRunningAtom,
-  currentStatusAtom,
+  selectedPipelineNameAtom,
   selectedSignalAtom,
   isMobileAtom,
-  availablePipelinesAtom,
-  pipelineStatusesAtom,
-  pipelineSignalsAtom,
 } from "@/atoms";
 import MobileResizeHandle from "./MobileResizeHandle";
 import VisualizationCard from "./VisualizationCard";
 import { ReadOnlySelect } from "@/components/ui/custom-select";
+import {
+  useGetPipelines,
+  useGetPipeline,
+  useStartPipeline,
+  useStopPipeline,
+  useSendSignal,
+  usePipelineWebSocket,
+} from "@/hooks";
 
 const Dashboard = () => {
-  const [selectedPipeline, setSelectedPipeline] = useAtom(selectedPipelineAtom);
-  const [pipelineRunning, setPipelineRunning] = useAtom(pipelineRunningAtom);
-  const [isLoading, setIsLoading] = useState(true);
-  const [currentStatus] = useAtom(currentStatusAtom);
+  // Get data from atoms
+  const [selectedPipelineName, setSelectedPipelineName] = useAtom(
+    selectedPipelineNameAtom
+  );
   const [selectedSignal, setSelectedSignal] = useAtom(selectedSignalAtom);
   const [isMobile, setIsMobile] = useAtom(isMobileAtom);
 
-  // New state for mobile panel heights
+  // Local state (only for UI loading and layout)
+  const [isLoading, setIsLoading] = useState(true);
   const [pipelinePanelHeight, setPipelinePanelHeight] = useState(300);
   const [configurationPanelHeight, setConfigurationPanelHeight] = useState(350);
   const [visualizationPanelHeight, setVisualizationPanelHeight] = useState(300);
-
-  // Get data from atoms
-  const [availablePipelines] = useAtom(availablePipelinesAtom);
-  const [pipelineSignals] = useAtom(pipelineSignalsAtom);
-  const [pipelineStatuses] = useAtom(pipelineStatusesAtom);
-
-  const MIN_SIZE_IN_PIXELS = 400;
-  const MAX_SIZE_IN_PIXELS = 500;
   const [minSize, setMinSize] = useState(24);
   const [maxSize, setMaxSize] = useState(36);
 
-  // First effect just for turning off loading
+  // Query hooks
+  const { data: pipelinesData, isLoading: isPipelinesLoading } =
+    useGetPipelines(true);
+  const { data: pipelineData } = useGetPipeline(selectedPipelineName, true);
+
+  // Derived values from API data
+  const availablePipelines = pipelinesData?.pipelines.map((p) => p.name) || [];
+  const pipelineRunning = pipelineData?.running || false;
+  const currentState = pipelineData?.state || "idle";
+
+  // Available states from selected pipeline
+  const pipelineStates = pipelineData?.available_states || ["idle", "running"];
+
+  // Available signals from selected pipeline
+  const pipelineSignals = pipelineData?.available_signals || [];
+
+  // Mutation hooks
+  const { mutate: startPipeline } = useStartPipeline();
+  const { mutate: stopPipeline } = useStopPipeline();
+  const { mutate: sendSignal } = useSendSignal();
+
+  // WebSocket connection
+  usePipelineWebSocket(selectedPipelineName, pipelineRunning);
+
+  const MIN_SIZE_IN_PIXELS = 400;
+  const MAX_SIZE_IN_PIXELS = 500;
+
+  // First effect just for turning off loading and setting up responsive layout
   useLayoutEffect(() => {
     const screenWidth = window.innerWidth;
     setMinSize(
@@ -85,19 +108,37 @@ const Dashboard = () => {
 
   // Handle toggle change for pipeline running state
   const handleToggleChange = (checked: boolean) => {
-    setPipelineRunning(checked);
-    console.log("Toggle changed to:", checked);
+    if (!selectedPipelineName) return;
+
+    if (checked) {
+      startPipeline(
+        { pipelineName: selectedPipelineName, debug: false },
+        {
+          onError: (error) => console.error("Failed to start pipeline:", error),
+        }
+      );
+    } else {
+      stopPipeline(selectedPipelineName, {
+        onError: (error) => console.error("Failed to stop pipeline:", error),
+      });
+    }
   };
 
   // Handle signal selection
   const handleSignalClick = (signal: string) => {
-    setSelectedSignal(signal);
-    console.log("Signal selected:", signal);
-    // Here you would send the signal to the backend
+    if (!selectedPipelineName || !pipelineRunning) return;
+
+    sendSignal(
+      { pipelineName: selectedPipelineName, signalName: signal },
+      {
+        onSuccess: () => setSelectedSignal(signal),
+        onError: (error) => console.error("Failed to send signal:", error),
+      }
+    );
   };
 
   // If still loading, show a spinning loader using Lucide React
-  if (isLoading) {
+  if (isLoading || isPipelinesLoading) {
     return (
       <div className="h-screen w-full bg-background flex items-center justify-center">
         <Loader2
@@ -128,13 +169,13 @@ const Dashboard = () => {
                 <div className="flex justify-between items-center gap-3 w-full">
                   <Select
                     onValueChange={(value) => {
-                      setSelectedPipeline(value);
+                      setSelectedPipelineName(value);
                     }}
-                    value={selectedPipeline || ""}
+                    value={selectedPipelineName || ""}
                     defaultValue=""
                     onOpenChange={() => {
                       // Reset any potential selection/highlight when opening
-                      if (!selectedPipeline) {
+                      if (!selectedPipelineName) {
                         setTimeout(() => {
                           const activeElement =
                             document.activeElement as HTMLElement;
@@ -156,7 +197,7 @@ const Dashboard = () => {
                         <SelectLabel className="px-3 py-1 border-b border-gray-100 text-xs font-semibold text-left">
                           Select Pipeline
                         </SelectLabel>
-                        {availablePipelines.map((pipeline) => (
+                        {availablePipelines.map((pipeline: string) => (
                           <SelectItem
                             key={pipeline}
                             value={pipeline}
@@ -187,7 +228,7 @@ const Dashboard = () => {
                         handleToggleChange(checked);
                       }}
                       id="pipeline-switch-mobile"
-                      disabled={!selectedPipeline}
+                      disabled={!selectedPipelineName}
                     />
                     {/* On larger screens, show the right label conditionally */}
                     <span
@@ -217,15 +258,15 @@ const Dashboard = () => {
               </div>
               <CardContent className="px-5 py-3 overflow-y-auto h-[calc(100%-3rem)]">
                 <div className="flex items-center justify-between mb-2">
-                  <h2 className="text-sm font-semibold">Status</h2>
+                  <h2 className="text-sm font-semibold">State</h2>
                   <div className="flex items-center">
                     <ReadOnlySelect
-                      value={selectedPipeline ? currentStatus : ""}
-                      options={selectedPipeline ? pipelineStatuses : []}
-                      label="Status"
+                      value={selectedPipelineName ? currentState : ""}
+                      options={selectedPipelineName ? pipelineStates : []}
+                      label="State"
                       width="120px"
                       placeholder="Select Pipeline First"
-                      disabled={!selectedPipeline}
+                      disabled={!selectedPipelineName}
                     />
                   </div>
                 </div>
@@ -234,19 +275,19 @@ const Dashboard = () => {
 
                 <h2 className="text-sm font-semibold mb-2">Signals</h2>
                 <div className="flex flex-wrap gap-2 mb-4">
-                  {selectedPipeline ? (
-                    pipelineSignals.map((signal) => (
+                  {selectedPipelineName ? (
+                    pipelineSignals.map((signal: string) => (
                       <button
                         key={signal}
                         type="button"
                         onClick={() => handleSignalClick(signal)}
-                        disabled={!selectedPipeline || !pipelineRunning}
+                        disabled={!selectedPipelineName || !pipelineRunning}
                         style={{
                           boxSizing: "border-box",
                         }}
                         className={cn(
                           "inline-flex items-center justify-center rounded-full px-3 py-1.5 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring h-7 min-w-[50px]",
-                          !selectedPipeline || !pipelineRunning
+                          !selectedPipelineName || !pipelineRunning
                             ? "opacity-50 cursor-not-allowed"
                             : "cursor-pointer",
                           signal === selectedSignal
@@ -281,10 +322,10 @@ const Dashboard = () => {
               </div>
               <CardContent className="px-5 py-3 h-[calc(100%-3rem)] flex flex-col overflow-y-auto">
                 <div className="flex-1 text-sm text-muted-foreground">
-                  {selectedPipeline ? (
+                  {selectedPipelineName ? (
                     <p>
-                      Configuration options for {selectedPipeline} will appear
-                      here.
+                      Configuration options for {selectedPipelineName} will
+                      appear here.
                     </p>
                   ) : (
                     <p>Select a pipeline to view configuration options.</p>
@@ -348,13 +389,13 @@ const Dashboard = () => {
                     <div className="flex justify-between items-center gap-3 w-full">
                       <Select
                         onValueChange={(value) => {
-                          setSelectedPipeline(value);
+                          setSelectedPipelineName(value);
                         }}
-                        value={selectedPipeline || ""}
+                        value={selectedPipelineName || ""}
                         defaultValue=""
                         onOpenChange={() => {
                           // Reset any potential selection/highlight when opening
-                          if (!selectedPipeline) {
+                          if (!selectedPipelineName) {
                             setTimeout(() => {
                               const activeElement =
                                 document.activeElement as HTMLElement;
@@ -376,7 +417,7 @@ const Dashboard = () => {
                             <SelectLabel className="px-3 py-1 border-b border-gray-100 text-xs font-semibold text-left">
                               Select Pipeline
                             </SelectLabel>
-                            {availablePipelines.map((pipeline) => (
+                            {availablePipelines.map((pipeline: string) => (
                               <SelectItem
                                 key={pipeline}
                                 value={pipeline}
@@ -407,7 +448,7 @@ const Dashboard = () => {
                             handleToggleChange(checked);
                           }}
                           id="pipeline-switch"
-                          disabled={!selectedPipeline}
+                          disabled={!selectedPipelineName}
                         />
                         {/* On larger screens, show the right label conditionally */}
                         <span
@@ -437,15 +478,15 @@ const Dashboard = () => {
                   </div>
                   <CardContent className="px-5 py-3 overflow-y-auto h-full">
                     <div className="flex items-center justify-between mb-2">
-                      <h2 className="text-sm font-semibold">Status</h2>
+                      <h2 className="text-sm font-semibold">State</h2>
                       <div className="flex items-center">
                         <ReadOnlySelect
-                          value={selectedPipeline ? currentStatus : ""}
-                          options={selectedPipeline ? pipelineStatuses : []}
-                          label="Status"
+                          value={selectedPipelineName ? currentState : ""}
+                          options={selectedPipelineName ? pipelineStates : []}
+                          label="State"
                           width="120px"
                           placeholder="Select Pipeline First"
-                          disabled={!selectedPipeline}
+                          disabled={!selectedPipelineName}
                         />
                       </div>
                     </div>
@@ -454,19 +495,19 @@ const Dashboard = () => {
 
                     <h2 className="text-sm font-semibold mb-2">Signals</h2>
                     <div className="flex flex-wrap gap-2 mb-4">
-                      {selectedPipeline ? (
-                        pipelineSignals.map((signal) => (
+                      {selectedPipelineName ? (
+                        pipelineSignals.map((signal: string) => (
                           <button
                             key={signal}
                             type="button"
                             onClick={() => handleSignalClick(signal)}
-                            disabled={!selectedPipeline || !pipelineRunning}
+                            disabled={!selectedPipelineName || !pipelineRunning}
                             style={{
                               boxSizing: "border-box",
                             }}
                             className={cn(
                               "inline-flex items-center justify-center rounded-full px-3 py-1.5 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring h-7 min-w-[50px]",
-                              !selectedPipeline || !pipelineRunning
+                              !selectedPipelineName || !pipelineRunning
                                 ? "opacity-50 cursor-not-allowed"
                                 : "cursor-pointer",
                               signal === selectedSignal
@@ -500,9 +541,9 @@ const Dashboard = () => {
                   </div>
                   <CardContent className="px-5 py-3 h-full flex flex-col overflow-y-auto">
                     <div className="flex-1 text-sm text-muted-foreground">
-                      {selectedPipeline ? (
+                      {selectedPipelineName ? (
                         <p>
-                          Configuration options for {selectedPipeline} will
+                          Configuration options for {selectedPipelineName} will
                           appear here.
                         </p>
                       ) : (

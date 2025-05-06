@@ -2,6 +2,7 @@ import os
 from typing import Any, Dict
 
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from lib.pipelines import PipelineFactory, SignalPriority
@@ -16,6 +17,15 @@ logger = get_logger("api")
 
 # Create FastAPI app
 app = FastAPI(title="Robot Arm Control API", description="API for controlling the robot arm pipeline")
+
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Allow all origins
+    allow_credentials=True,
+    allow_methods=["*"],  # Allow all methods
+    allow_headers=["*"],  # Allow all headers
+)
 
 # Include WebSocket routes
 app.include_router(websocket_router)

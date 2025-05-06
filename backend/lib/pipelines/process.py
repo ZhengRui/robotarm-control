@@ -135,7 +135,11 @@ class PipelineProcess:
             return
 
         logger.debug(f"Sending signal '{signal}' to pipeline '{self.pipeline_name}'")
-        self.signal_queue.put({"type": "signal", "signal": signal, "priority": priority})
+
+        if signal == "stop":
+            self.stop()
+        else:
+            self.signal_queue.put({"type": "signal", "signal": signal, "priority": priority})
 
     def get_status(self) -> Dict[str, Any]:
         """Get the current status of the pipeline.

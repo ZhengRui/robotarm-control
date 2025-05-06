@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { useAtom } from "jotai";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -9,24 +10,25 @@ import {
   Download,
   MoreHorizontal,
 } from "lucide-react";
-import {
-  selectedPipelineAtom,
-  pipelineRunningAtom,
-  selectedQueueAtom,
-  pipelineQueuesAtom,
-} from "@/atoms";
+import { selectedPipelineNameAtom } from "@/atoms";
 import { MultiSelect, Tag, TagsContainer } from "@/components/ui/custom-select";
+import { useGetPipeline } from "@/hooks";
 
 const VisualizationCard = () => {
-  const [selectedPipeline] = useAtom(selectedPipelineAtom);
-  const [pipelineRunning] = useAtom(pipelineRunningAtom);
-  const [selectedQueues, setSelectedQueues] = useAtom(selectedQueueAtom);
-  const [pipelineQueues] = useAtom(pipelineQueuesAtom);
+  const [selectedPipelineName] = useAtom(selectedPipelineNameAtom);
+  const { data: pipelineData } = useGetPipeline(selectedPipelineName, true);
+
+  // Only the selected queues need to be local state
+  const [selectedQueues, setSelectedQueues] = useState<string[]>([]);
 
   // Handle queue selection (now supports multi-select)
   const handleQueueSelection = (newSelection: string[]) => {
     setSelectedQueues(newSelection);
   };
+
+  // Derived values directly from pipelineData
+  const pipelineRunning = pipelineData?.running || false;
+  const pipelineQueues = pipelineData?.available_queues || [];
 
   return (
     <Card className="h-full shadow-sm rounded-md overflow-auto border-0 bg-gray-200 p-0 gap-0">
@@ -76,9 +78,9 @@ const VisualizationCard = () => {
             <MultiSelect
               label="Stream Queues"
               selectedValues={selectedQueues}
-              options={selectedPipeline ? pipelineQueues : []}
+              options={selectedPipelineName ? pipelineQueues : []}
               onChange={handleQueueSelection}
-              disabled={!selectedPipeline || !pipelineRunning}
+              disabled={!selectedPipelineName || !pipelineRunning}
               placeholder="Select queues"
             />
           </div>
@@ -102,7 +104,7 @@ const VisualizationCard = () => {
         </div>
 
         <div className="flex-1 flex items-start justify-center min-h-[100px]">
-          {selectedPipeline ? (
+          {selectedPipelineName ? (
             selectedQueues.length > 0 ? (
               <div className="w-full text-center text-sm text-muted-foreground h-8 mt-2">
                 <p className="line-clamp-2">
