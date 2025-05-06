@@ -1,4 +1,4 @@
-from typing import Any, ClassVar, Dict, List, Optional, Type, Union
+from typing import Any, ClassVar, Dict, List, Optional, Type, TypedDict, Union
 
 from ..utils.logger import get_logger
 from .base import BasePipeline
@@ -6,6 +6,22 @@ from .manager import PipelineManager
 
 # Initialize logger
 logger = get_logger("pipeline_factory")
+
+
+class PipelineMeta(TypedDict):
+    """Type for pipeline metadata."""
+
+    available_states: List[str]
+    available_signals: List[str]
+    available_queues: List[str]
+    config_schema: Dict[str, Any]
+
+
+class PipelineRegistryEntry(TypedDict):
+    """Type for pipeline registry entries."""
+
+    class_: Type[BasePipeline]
+    meta: PipelineMeta
 
 
 class PipelineFactory:
@@ -16,7 +32,7 @@ class PipelineFactory:
     """
 
     # Registry of available pipeline classes
-    _pipeline_registry: ClassVar[Dict[str, Type[BasePipeline]]] = {}
+    _pipeline_registry: ClassVar[Dict[str, PipelineRegistryEntry]] = {}
 
     # Singleton pipeline manager instance
     _manager: Optional[PipelineManager] = None
@@ -29,7 +45,15 @@ class PipelineFactory:
             name: Name to register the pipeline class under
             pipeline_class: The pipeline class to register
         """
-        cls._pipeline_registry[name] = pipeline_class
+        cls._pipeline_registry[name] = {
+            "class_": pipeline_class,
+            "meta": {
+                "available_states": pipeline_class.get_available_states(),
+                "available_signals": pipeline_class.get_available_signals(),
+                "available_queues": pipeline_class.get_available_queues(),
+                "config_schema": pipeline_class.get_config_schema(),
+            },
+        }
         logger.debug(f"Registered pipeline class: {name}")
 
     @classmethod
@@ -43,6 +67,25 @@ class PipelineFactory:
             cls._manager = PipelineManager()
             logger.debug("Created new PipelineManager instance")
         return cls._manager
+
+    @classmethod
+    def get_available_pipelines(cls) -> List[str]:
+        """Get list of available (registered) pipelines.
+
+        Returns:
+            List of pipeline names that are registered
+        """
+        return list(cls._pipeline_registry.keys())
+
+    @classmethod
+    def get_running_pipelines(cls) -> List[str]:
+        """Get list of currently running pipelines.
+
+        Returns:
+            List of pipeline names that are currently running
+        """
+        manager = cls.get_pipeline_manager()
+        return manager.get_running_pipelines()
 
     @classmethod
     def create_pipeline(
@@ -64,14 +107,14 @@ class PipelineFactory:
         Raises:
             ValueError: If pipeline_name is not registered
         """
-        # Ensure pipeline class is registered
+        # Check if pipeline is registered
         if pipeline_name not in cls._pipeline_registry:
-            error_msg = f"Unknown pipeline type: {pipeline_name}"
+            error_msg = f"Unknown pipeline: {pipeline_name}"
             logger.error(error_msg)
             raise ValueError(error_msg)
 
         # Get the pipeline class
-        pipeline_class = cls._pipeline_registry[pipeline_name]
+        pipeline_class = cls._pipeline_registry[pipeline_name]["class_"]
 
         # Create the pipeline through the manager
         manager = cls.get_pipeline_manager()
@@ -118,8 +161,30 @@ class PipelineFactory:
             Dictionary with status information for a specific pipeline,
             or list of dictionaries for all pipelines
         """
+        if pipeline_name is not None and pipeline_name not in cls._pipeline_registry:
+            error_msg = f"Unknown pipeline: {pipeline_name}"
+            logger.error(error_msg)
+            raise ValueError(error_msg)
+
         manager = cls.get_pipeline_manager()
         return manager.get_status(pipeline_name)
+
+    @classmethod
+    def get_meta(cls, pipeline_name: str) -> PipelineMeta:
+        """Get meta information for a pipeline.
+
+        Args:
+            pipeline_name: Name of the pipeline
+
+        Returns:
+            Dictionary with meta information for a specific pipeline
+        """
+        if pipeline_name not in cls._pipeline_registry:
+            error_msg = f"Unknown pipeline: {pipeline_name}"
+            logger.error(error_msg)
+            raise ValueError(error_msg)
+
+        return cls._pipeline_registry[pipeline_name]["meta"]
 
     @classmethod
     def cleanup(cls) -> None:
@@ -130,3 +195,5 @@ class PipelineFactory:
         if cls._manager:
             cls._manager.cleanup()
             cls._manager = None
+
+        cls._pipeline_registry = {}

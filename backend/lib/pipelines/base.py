@@ -61,24 +61,6 @@ class BasePipeline(ABC):
         logger.info(f"Pipeline '{pipeline_name}' initialized handlers: {', '.join(self.handlers.keys())}")
 
     @property
-    def available_signals(self) -> List[str]:
-        """Return the available signals for this pipeline.
-
-        Returns:
-            List of signal strings that can be sent to this pipeline
-        """
-        return []  # Base implementation returns empty list
-
-    @property
-    def available_states(self) -> List[str]:
-        """Return the available states for this pipeline.
-
-        Returns:
-            List of possible state strings for this pipeline
-        """
-        return []  # Base implementation returns empty list
-
-    @property
     def current_state(self) -> Optional[str]:
         """Return the current state of the pipeline.
 
@@ -86,6 +68,50 @@ class BasePipeline(ABC):
             Current state as a string, or None if not applicable
         """
         return None  # Base implementation returns None
+
+    @classmethod
+    def get_available_signals(cls) -> List[str]:
+        """Return the available signals for this pipeline class.
+
+        This class method allows getting pipeline signals without instantiation.
+
+        Returns:
+            List of signal strings that can be sent to this pipeline
+        """
+        return []  # Base implementation returns empty list
+
+    @classmethod
+    def get_available_states(cls) -> List[str]:
+        """Return the available states for this pipeline class.
+
+        This class method allows getting pipeline states without instantiation.
+
+        Returns:
+            List of possible state strings for this pipeline
+        """
+        return []  # Base implementation returns empty list
+
+    @classmethod
+    def get_available_queues(cls) -> List[str]:
+        """Return the available data queues for this pipeline class.
+
+        This class method allows getting queue information without instantiation.
+
+        Returns:
+            List of queue names that this pipeline uses
+        """
+        return []  # Base implementation returns empty list
+
+    @classmethod
+    def get_config_schema(cls) -> Dict[str, Any]:
+        """Return the configuration schema for this pipeline class.
+
+        This class method allows getting configuration schema without instantiation.
+
+        Returns:
+            Dictionary containing the configuration schema for this pipeline
+        """
+        return {}  # Base implementation returns empty dict
 
     def _load_config(self) -> Dict[str, Any]:
         """Load configuration from default.yaml.

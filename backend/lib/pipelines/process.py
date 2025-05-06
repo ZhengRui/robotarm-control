@@ -317,14 +317,10 @@ def _send_status(pipeline: BasePipeline, status_queue: multiprocessing.Queue, st
     try:
         # Get basic status information
         status: Dict[str, Any] = {
-            "state": pipeline.current_state,
             "running": not stop_event.is_set(),
+            "state": pipeline.current_state,
             "timestamp": time.time(),
         }
-
-        # Add available signals and states
-        status["available_signals"] = pipeline.available_signals
-        status["available_states"] = pipeline.available_states
 
         # Send to main process
         status_queue.put(status)

@@ -1,3 +1,4 @@
+import time
 from typing import Any, Dict, List, Optional, Type, Union
 
 from ..utils.logger import get_logger
@@ -21,7 +22,7 @@ class PipelineManager:
     - Coordinating pipeline lifecycle
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize the pipeline manager."""
         self.pipelines: Dict[str, PipelineProcess] = {}
 
@@ -124,28 +125,60 @@ class PipelineManager:
             pipeline_name: Name of the pipeline, or None for all pipelines
 
         Returns:
-            Dictionary with status information
+            Dictionary with status information for a specific pipeline,
+            or list of dictionaries for all pipelines
         """
+        status: Dict[str, Any]
+
         if pipeline_name is not None:
             # Get status of specific pipeline
             if pipeline_name not in self.pipelines:
-                return {"error": f"Pipeline '{pipeline_name}' not found"}
+                return {
+                    "name": pipeline_name,
+                    "running": False,
+                    "state": None,
+                    "timestamp": time.time(),
+                    "config": {},
+                    "queues": [],
+                }
 
-            return {"pipeline": pipeline_name, "status": self.pipelines[pipeline_name].get_status()}
-        else:
-            # Get status of all pipelines
-            status = []
+            # Create a base status dictionary
+            status = {
+                "name": pipeline_name,
+                "config": {},
+                "queues": [],
+            }
 
-            for name, pipeline in self.pipelines.items():
-                status.append({"pipeline": name, "status": pipeline.get_status()})
+            # Get the pipeline's status and merge with base status
+            pipeline_status = self.pipelines[pipeline_name].get_status()
+            status.update(pipeline_status)
 
             return status
+        else:
+            # Get status of all pipelines
+            status_list: List[Dict[str, Any]] = []
 
-    def get_available_pipelines(self) -> List[str]:
+            for name, pipeline in self.pipelines.items():
+                # Create a base status dictionary
+                status = {
+                    "name": name,
+                    "config": {},
+                    "queues": [],
+                }
+
+                # Get the pipeline's status and merge with base status
+                pipeline_status = pipeline.get_status()
+                status.update(pipeline_status)
+
+                status_list.append(status)
+
+            return status_list
+
+    def get_running_pipelines(self) -> List[str]:
         """Get list of currently running pipelines.
 
         Returns:
-            List of pipeline names
+            List of pipeline names of currently running pipelines
         """
         return list(self.pipelines.keys())
 

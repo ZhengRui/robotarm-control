@@ -74,79 +74,67 @@
 ### REST Endpoints
 
 #### 1. `GET /pipelines`
-**Purpose:** Get information about all available pipelines with optional detail level
+**Purpose:** Get information about all available pipelines with option to include metadata
 
 **Query Parameters:**
-- `level`: (`basic` | `detailed`, default: `basic`)
-  - `basic`: Returns just names and running status
-  - `detailed`: Returns full information including status, signals, configs, queues
+- `with_meta`: (`true` | `false`, default: `false`)
+  - If true, includes additional metadata like available states, signals, etc.
 
 **Response:**
 ```json
-// level=basic
-{
-  "available_pipelines": ["yahboom_pick_and_place", "other_pipeline"],
-  "running_pipelines": ["yahboom_pick_and_place"]
-}
-
-// level=detailed
 {
   "pipelines": [
     {
       "name": "yahboom_pick_and_place",
       "running": true,
-      "status": "CALIBRATING",
-      "available_signals": ["STOP", "PAUSE", "CALIBRATE"],
-      "available_states": ["IDLE", "RUNNING", "CALIBRATING", "PICKING", "PLACING"],
-      "configuration": {
-        "dataloader": { /* current config */ },
-        "detect": { /* current config */ }
-      },
-      "queues": ["camera_frames", "detection_results"]
+      "state": "CALIBRATING",
+      "timestamp": 1633028145.123
+      // If with_meta=true, also includes:
+      "available_states": ["idle", "calibrating", "detecting", "picking_placing", "stopped"],
+      "available_signals": ["calibration_confirmed", "start_pick_place", "stop"],
+      "available_queues": ["camera_frames", "detection_results"],
+      "config_schema": { /* configuration schema */ }
     },
     {
       "name": "other_pipeline",
       "running": false,
-      // other detailed info if pipeline exists in registry
+      // other pipeline info
     }
   ]
 }
 ```
 
-#### 2. `GET /pipeline/{pipeline_name}`
+#### 2. `GET /pipeline`
 **Purpose:** Get detailed information about a specific pipeline
 
-**Path Parameters:**
+**Query Parameters:**
 - `pipeline_name`: Name of the pipeline
+- `with_meta`: (`true` | `false`, default: `false`)
+  - If true, includes additional metadata like available states, signals, etc.
 
 **Response:**
 ```json
 {
   "name": "yahboom_pick_and_place",
   "running": true,
-  "status": "CALIBRATING",
-  "available_signals": ["STOP", "PAUSE", "CALIBRATE"],
-  "available_states": ["IDLE", "RUNNING", "CALIBRATING", "PICKING", "PLACING"],
-  "configuration": {
-    "dataloader": { /* current config */ },
-    "detect": { /* current config */ }
-  },
-  "queues": ["camera_frames", "detection_results"]
+  "state": "CALIBRATING",
+  "timestamp": 1633028145.123,
+  "config": { /* current configuration */ },
+  "queues": []
+  // If with_meta=true, also includes:
+  "available_states": ["idle", "calibrating", "detecting", "picking_placing", "stopped"],
+  "available_signals": ["calibration_confirmed", "start_pick_place", "stop"],
+  "available_queues": ["camera_frames", "detection_results"],
+  "config_schema": { /* configuration schema */ }
 }
 ```
 
-#### 3. `POST /pipeline/{pipeline_name}/start`
+#### 3. `POST /pipeline/start`
 **Purpose:** Start a specific pipeline
 
-**Path Parameters:**
+**Query Parameters:**
 - `pipeline_name`: Name of the pipeline to start
-
-**Request Body:**
-```json
-{
-  "debug": true
-}
-```
+- `debug`: (`true` | `false`, default: `false`) - Enable debug mode
 
 **Response:**
 ```json
@@ -157,10 +145,10 @@
 }
 ```
 
-#### 4. `POST /pipeline/{pipeline_name}/stop`
+#### 4. `POST /pipeline/stop`
 **Purpose:** Stop a running pipeline
 
-**Path Parameters:**
+**Query Parameters:**
 - `pipeline_name`: Name of the pipeline to stop
 
 **Response:**
@@ -172,14 +160,12 @@
 }
 ```
 
-#### 5. `POST /pipeline/{pipeline_name}/signal/{signal_name}`
+#### 5. `POST /pipeline/signal`
 **Purpose:** Send a signal to a running pipeline
 
-**Path Parameters:**
-- `pipeline_name`: Name of the target pipeline
-- `signal_name`: Name of the signal to send
-
 **Query Parameters:**
+- `pipeline_name`: Name of the target pipeline
+- `signal`: Name of the signal to send
 - `priority`: (`HIGH` | `NORMAL`, default: `NORMAL`) - Signal priority
 
 **Response:**
@@ -192,10 +178,10 @@
 }
 ```
 
-#### 6. `POST /pipeline/{pipeline_name}/config`
+#### 6. `POST /pipeline/config`
 **Purpose:** Update pipeline configuration
 
-**Path Parameters:**
+**Query Parameters:**
 - `pipeline_name`: Name of the pipeline to configure
 
 **Request Body:**
@@ -222,57 +208,7 @@
 {
   "status": "success",
   "pipeline": "yahboom_pick_and_place",
-  "message": "Configuration updated successfully",
-  "applied_config": {
-    // The new effective configuration
-  }
-}
-```
-
-#### 7. `GET /pipeline/{pipeline_name}/config/schema`
-**Purpose:** Get configuration schema for dynamic UI rendering
-
-**Path Parameters:**
-- `pipeline_name`: Name of the pipeline
-
-**Response:**
-```json
-{
-  "dataloader": {
-    "type": "object",
-    "properties": {
-      "init": {
-        "type": "object",
-        "properties": {
-          "name": {
-            "type": "string",
-            "enum": ["redis", "imagezmq"],
-            "description": "Backend type for loading data"
-          },
-          "host": {
-            "type": "string",
-            "description": "Server host address"
-          },
-          // other properties
-        }
-      },
-      "process": {
-        "type": "object",
-        "properties": {
-          "queue": {
-            "type": "string",
-            "description": "Redis queue name for frames"
-          },
-          "wait": {
-            "type": "boolean",
-            "description": "Whether to wait for frames if none available"
-          }
-          // other properties
-        }
-      }
-    }
-  },
-  // schemas for other components
+  "message": "Configuration updated successfully"
 }
 ```
 
@@ -281,14 +217,14 @@
 WebSocket connections are used exclusively for real-time state broadcasting from the server to clients. All client actions and commands are sent through the REST endpoints, which provide immediate acknowledgments via HTTP responses. WebSockets complement this by pushing state changes to all connected clients, ensuring everyone has the current view of the system.
 
 #### 1. `ws/pipeline/{pipeline_name}`
-**Purpose:** Stream real-time pipeline status updates and events
+**Purpose:** Stream real-time pipeline state updates and events
 
 **Path Parameters:**
 - `pipeline_name`: Name of the pipeline to monitor
 
 **Message Types:**
 - `connection_status`: Sent when WebSocket connection is established
-- `status_update`: When pipeline state or status changes
+- `state_update`: When pipeline state changes
 - `config_update`: When pipeline configuration is modified
 - `lifecycle_event`: When pipeline is started or stopped
 - `notification`: Errors, warnings, or information messages
@@ -303,12 +239,12 @@ WebSocket connections are used exclusively for real-time state broadcasting from
 }
 ```
 
-**Status Update Message:**
+**State Update Message:**
 ```json
 {
   "type": "status_update",
   "pipeline": "yahboom_pick_and_place",
-  "status": "PICKING",
+  "state": "PICKING",
   "previous_status": "CALIBRATING",
   "timestamp": 1633028145.123
 }

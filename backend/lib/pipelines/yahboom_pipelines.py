@@ -75,23 +75,41 @@ class YahboomPickAndPlacePipeline(BasePipeline):
         # Call parent constructor - this will start the pipeline thread
         super().__init__(pipeline_name=pipeline_name, config_override=config_override, debug=debug)
 
-    @property
-    def available_signals(self) -> List[str]:
-        """Return the available signals for this pipeline.
+    @classmethod
+    def get_available_signals(cls) -> List[str]:
+        """Return the available signals for this pipeline class.
 
         Returns:
             List of signal strings that can be sent to this pipeline
         """
         return [signal.value for signal in PipelineSignal]
 
-    @property
-    def available_states(self) -> List[str]:
-        """Return the available states for this pipeline.
+    @classmethod
+    def get_available_states(cls) -> List[str]:
+        """Return the available states for this pipeline class.
 
         Returns:
             List of possible state strings for this pipeline
         """
         return [state.value for state in PipelineState]
+
+    @classmethod
+    def get_available_queues(cls) -> List[str]:
+        """Return the available data queues for this pipeline class.
+
+        Returns:
+            List of queue names that this pipeline uses
+        """
+        return ["camera_frames", "detection_results"]
+
+    @classmethod
+    def get_config_schema(cls) -> Dict[str, Any]:
+        """Return the configuration schema for this pipeline class.
+
+        Returns:
+            Dictionary containing the configuration schema for this pipeline
+        """
+        return {}
 
     @property
     def current_state(self) -> str:

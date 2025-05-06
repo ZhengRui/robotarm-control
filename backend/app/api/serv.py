@@ -1,8 +1,6 @@
 import os
-from pathlib import Path
-from typing import List
+from typing import Any, Dict
 
-import yaml
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
@@ -11,129 +9,99 @@ from lib.utils.logger import get_logger
 
 from ..config import config
 
+# from ..utils.websocket import manager
+# from .ws_routes import router as websocket_router
+
 # Initialize logger
 logger = get_logger("api")
 
 # Create FastAPI app
 app = FastAPI(title="Robot Arm Control API", description="API for controlling the robot arm pipeline")
 
+# Include WebSocket routes
+# app.include_router(websocket_router)
+
 # Get initial pipeline settings from environment variables
 initial_pipeline = os.environ.get("PIPELINE")
 initial_debug = os.environ.get("DEBUG", "").lower() == "true"
 
 
-# Define request models
 class SignalRequest(BaseModel):
+    """Signal request model."""
+
     signal: str
     priority: SignalPriority = SignalPriority.NORMAL
 
 
-class PipelineRequest(BaseModel):
-    pipeline_name: str
-    debug: bool = False
+# class ConfigUpdateRequest(BaseModel):
+#     """Configuration update request model."""
+#     __root__: Dict[str, Any] = Field(
+#         ..., description="Pipeline configuration updates"
+#     )
 
 
-def get_available_pipelines() -> List[str]:
-    """Get list of available pipelines from default.yaml.
-
-    Returns:
-        List of pipeline names
-    """
-    # Use Path for better path handling
-    config_path = Path(__file__).parent.parent.parent / "lib" / "pipelines" / "default.yaml"
-    try:
-        with open(config_path, "r") as f:
-            config = yaml.safe_load(f) or {}
-            return list(config.keys())
-    except (yaml.YAMLError, IOError) as e:
-        logger.error(f"Failed to load pipeline configuration: {e}", exc_info=True)
-        return []
-
-
-@app.post("/signal", status_code=200)
-async def send_signal(request: SignalRequest, pipeline_name: str):
-    """Send a signal to a running pipeline.
-
-    Args:
-        request: The signal request containing signal and priority
-        pipeline_name: Target pipeline name
-    """
-    # Check if pipeline is running by getting its specific status
-    pipeline_status = PipelineFactory.get_status(pipeline_name)
-
-    if "error" in pipeline_status:
-        raise HTTPException(status_code=404, detail=f"Pipeline '{pipeline_name}' is not running")
-
-    # Convert SignalPriority enum to integer priority value
-    # HIGH is 1, NORMAL is 2 (lower number = higher priority)
-    priority_value = 1 if request.priority == SignalPriority.HIGH else 2
-
-    # Send the signal
-    success = PipelineFactory.send_signal(pipeline_name, request.signal, priority_value)
-
-    if not success:
-        raise HTTPException(status_code=500, detail=f"Failed to send signal to pipeline '{pipeline_name}'")
-
-    logger.info(f"Signal '{request.signal}' sent to pipeline '{pipeline_name}' with priority {request.priority.name}")
-    return {"status": "success", "message": f"Signal '{request.signal}' sent successfully"}
-
-
-@app.get("/info", status_code=200)
-@app.get("/status", status_code=200)
-async def get_status(pipeline_name: str):
-    """Get information about available signals and states for a pipeline.
-
-    Args:
-        pipeline_name: Pipeline name to get info for
-    """
-    # Get detailed status for the pipeline
-    pipeline_status = PipelineFactory.get_status(pipeline_name)
-
-    # Since we're requesting status for a specific pipeline, we should get a dictionary
-    # However, let's check and handle appropriately to satisfy the type checker
-    if isinstance(pipeline_status, dict) and "error" in pipeline_status:
-        raise HTTPException(status_code=404, detail=pipeline_status["error"])
-
-    return pipeline_status
-
-
-@app.get("/pipelines", status_code=200)
-async def list_pipelines():
-    """List all available pipelines and running pipelines."""
+@app.get("/pipelines")
+async def get_pipelines(with_meta: bool = False):
+    """Get information about all available pipelines."""
     # Get all registered pipelines from config
-    available_pipelines = get_available_pipelines()
+    available_pipeline_names = PipelineFactory.get_available_pipelines()
 
-    # Get status to get running pipelines
-    status_list = PipelineFactory.get_status()
-    running_pipelines = []
+    # Format response based on requested detail level
+    pipelines = []
 
-    # Handle the list of dictionaries properly
-    if isinstance(status_list, list):
-        running_pipelines = [each["pipeline"] for each in status_list]
+    for pipeline_name in available_pipeline_names:
+        pipeline_status = PipelineFactory.get_status(pipeline_name)
+        if with_meta and isinstance(pipeline_status, dict):
+            meta = PipelineFactory.get_meta(pipeline_name)
+            pipeline_status.update(meta)
 
-    return {"available_pipelines": available_pipelines, "running_pipelines": running_pipelines}
+        pipelines.append(pipeline_status)
+
+    return {"pipelines": pipelines}
 
 
-@app.post("/pipelines/start", status_code=200)
-async def start_pipeline(request: PipelineRequest):
+@app.get("/pipeline")
+async def get_pipeline(pipeline_name: str, with_meta: bool = False):
+    """Get detailed information about a specific pipeline.
+
+    Args:
+        pipeline_name: Name of the pipeline
+    """
+    try:
+        pipeline_status = PipelineFactory.get_status(pipeline_name)
+        if with_meta and isinstance(pipeline_status, dict):
+            meta = PipelineFactory.get_meta(pipeline_name)
+            pipeline_status.update(meta)
+
+        return pipeline_status
+    except ValueError as e:
+        # Handle case where pipeline is not registered
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        logger.error(f"Failed to get pipeline info: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to get pipeline info: {e!s}")
+
+
+@app.post("/pipeline/start")
+async def start_pipeline(pipeline_name: str, debug: bool = False):
     """Start a specific pipeline.
 
     Args:
-        request: The pipeline request containing pipeline_name and debug flag
+        pipeline_name: Name of the pipeline to start
+        debug: Debug flag
     """
     try:
-        # Create and start the pipeline
         success = PipelineFactory.create_pipeline(
-            request.pipeline_name, config_override=config.get(request.pipeline_name, {}), debug=request.debug
+            pipeline_name, config_override=config.get(pipeline_name, {}), debug=debug
         )
 
         if not success:
-            raise HTTPException(status_code=500, detail=f"Failed to start pipeline '{request.pipeline_name}'")
+            raise HTTPException(status_code=500, detail=f"Failed to start pipeline '{pipeline_name}'")
 
         return {
             "status": "success",
-            "pipeline": request.pipeline_name,
-            "message": f"Pipeline '{request.pipeline_name}' started successfully",
+            "pipeline": pipeline_name,
+            "message": f"Pipeline '{pipeline_name}' started successfully",
         }
     except ValueError as e:
         # Handle case where pipeline is not registered
@@ -143,19 +111,18 @@ async def start_pipeline(request: PipelineRequest):
         raise HTTPException(status_code=500, detail=f"Failed to start pipeline: {e!s}")
 
 
-@app.post("/pipelines/stop", status_code=200)
+@app.post("/pipeline/stop")
 async def stop_pipeline(pipeline_name: str):
     """Stop a running pipeline.
 
     Args:
-        pipeline_name: Pipeline name to stop
+        pipeline_name: Name of the pipeline to stop
     """
-    # Check if pipeline is running by getting its specific status
-    pipeline_status = PipelineFactory.get_status(pipeline_name)
+    pipeline_status = await get_pipeline(pipeline_name)
+    running = pipeline_status.get("running", False)
 
-    # Check for error in the pipeline status
-    if isinstance(pipeline_status, dict) and "error" in pipeline_status:
-        return {"status": "success", "message": f"Pipeline '{pipeline_name}' is not running"}
+    if not running:
+        return {"status": "success", "pipeline": pipeline_name, "message": f"Pipeline '{pipeline_name}' is not running"}
 
     # Stop the pipeline
     success = PipelineFactory.stop_pipeline(pipeline_name)
@@ -163,7 +130,60 @@ async def stop_pipeline(pipeline_name: str):
     if not success:
         raise HTTPException(status_code=500, detail=f"Failed to stop pipeline '{pipeline_name}'")
 
-    return {"status": "success", "message": f"Pipeline '{pipeline_name}' stopped successfully"}
+    return {
+        "status": "success",
+        "pipeline": pipeline_name,
+        "message": f"Pipeline '{pipeline_name}' stopped successfully",
+    }
+
+
+@app.post("/pipeline/signal")
+async def send_signal(pipeline_name: str, signal_name: str, priority: SignalPriority = SignalPriority.NORMAL):
+    """Send a signal to a running pipeline.
+
+    Args:
+        pipeline_name: Name of the target pipeline
+        signal_name: Name of the signal to send
+        priority: Signal priority (HIGH or NORMAL)
+    """
+    pipeline_status = await get_pipeline(pipeline_name)
+    running = pipeline_status.get("running", False)
+
+    if not running:
+        raise HTTPException(status_code=404, detail=f"Pipeline '{pipeline_name}' is not running")
+
+    # Convert SignalPriority enum to integer priority value
+    # HIGH is 1, NORMAL is 2 (lower number = higher priority)
+    priority_value = 1 if priority == SignalPriority.HIGH else 2
+
+    # Send the signal
+    success = PipelineFactory.send_signal(pipeline_name, signal_name, priority_value)
+
+    if not success:
+        raise HTTPException(status_code=500, detail=f"Failed to send signal to pipeline '{pipeline_name}'")
+
+    logger.info(f"Signal '{signal_name}' sent to pipeline '{pipeline_name}' with priority {priority.name}")
+    return {
+        "status": "success",
+        "pipeline": pipeline_name,
+        "signal": signal_name,
+        "message": "Signal sent successfully",
+    }
+
+
+@app.post("/pipeline/config")
+async def update_config(pipeline_name: str, config_update: Dict[str, Any]):
+    """Update pipeline configuration.
+
+    Args:
+        pipeline_name: Name of the pipeline to configure
+        config_update: Configuration updates
+    """
+    # This endpoint would require enhancing the PipelineFactory/Manager to support
+    # updating configuration of a running pipeline
+
+    # For now, return a not implemented response
+    raise HTTPException(status_code=501, detail="Configuration updates for running pipelines not yet implemented")
 
 
 # No automatic pipeline startup on application start
@@ -171,6 +191,9 @@ async def stop_pipeline(pipeline_name: str):
 async def startup_event():
     """Initialize API service."""
     logger.info("API server starting")
+
+    # Start WebSocket manager background tasks
+    # manager.start_background_tasks()
 
     # Start initial pipeline if specified in environment variables
     if initial_pipeline:
@@ -192,4 +215,9 @@ async def startup_event():
 async def shutdown_event():
     """Clean up resources when the API shuts down."""
     logger.info("API server shutting down, cleaning up resources")
+
+    # Clean up WebSocket connections
+    # manager.cleanup()
+
+    # Clean up pipeline resources
     PipelineFactory.cleanup()
