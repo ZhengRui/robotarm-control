@@ -4,4 +4,4 @@ export { useStartPipeline } from "./useStartPipeline";
 export { useStopPipeline } from "./useStopPipeline";
 export { useSendSignal } from "./useSendSignal";
 export { usePipelineWebSocket } from "./usePipelineWebSocket";
-export { useQueueWebSocket } from "./useQueueWebSocket";
+export { useQueueWebSockets } from "./useQueueWebSockets";

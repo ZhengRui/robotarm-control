@@ -225,7 +225,8 @@ class YahboomPickAndPlacePipeline(BasePipeline):
                     self.current_pt_frame = cv2.warpPerspective(self.current_frame, self.pt_matrix, (w, h))
 
                     self.publish_to_queue(
-                        PipelineQueue.PT_FRAMES.value, {"frame": self._encode_frame(self.current_pt_frame)}
+                        PipelineQueue.PT_FRAMES.value,
+                        {"frame": self._encode_frame(self.current_pt_frame)},
                     )
             else:
                 logger.warning("DataLoader did not return a valid frame")
