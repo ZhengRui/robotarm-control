@@ -51,16 +51,16 @@ const Dashboard = () => {
 
   // Query hooks
   const { data: pipelinesData, isLoading: isPipelinesLoading } =
-    useGetPipelines(true);
+    useGetPipelines(false);
   const { data: pipelineData } = useGetPipeline(selectedPipelineName, true);
 
   // Derived values from API data
   const availablePipelines = pipelinesData?.pipelines.map((p) => p.name) || [];
   const pipelineRunning = pipelineData?.running || false;
-  const currentState = pipelineData?.state || "idle";
+  const currentState = pipelineData?.state || "stopped";
 
   // Available states from selected pipeline
-  const pipelineStates = pipelineData?.available_states || ["idle", "running"];
+  const pipelineStates = pipelineData?.available_states || ["stopped"];
 
   // Available signals from selected pipeline
   const pipelineSignals = pipelineData?.available_signals || [];
@@ -71,7 +71,7 @@ const Dashboard = () => {
   const { mutate: sendSignal } = useSendSignal();
 
   // WebSocket connection
-  usePipelineWebSocket(selectedPipelineName, pipelineRunning);
+  usePipelineWebSocket(selectedPipelineName);
 
   const MIN_SIZE_IN_PIXELS = 400;
   const MAX_SIZE_IN_PIXELS = 500;

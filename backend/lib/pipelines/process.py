@@ -319,10 +319,11 @@ def _send_status(pipeline: BasePipeline, status_queue: multiprocessing.Queue, st
         stop_event: Process termination event
     """
     try:
+        running = not stop_event.is_set()
         # Get basic status information
         status: Dict[str, Any] = {
-            "running": not stop_event.is_set(),
-            "state": pipeline.current_state,
+            "running": running,
+            "state": pipeline.current_state if running else "stopped",
             "timestamp": time.time(),
         }
 

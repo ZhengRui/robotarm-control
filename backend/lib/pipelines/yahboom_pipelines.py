@@ -179,7 +179,7 @@ class YahboomPickAndPlacePipeline(BasePipeline):
 
         if self.current_frame is None:
             # No frame available, sleep a bit to avoid busy waiting
-            time.sleep(1)
+            time.sleep(0.01)
             return
 
         # Process the frame based on current state
@@ -302,5 +302,4 @@ class YahboomPickAndPlacePipeline(BasePipeline):
             # Process objects with arm control handler
             self.handlers["armcontrol"].process(self.detected_objects, debug=self.debug, **process_params)
         except Exception as e:
-            logger.error(f"Error in pick and place operation: {e}")
             logger.error(f"Error in pick and place operation: {e}")

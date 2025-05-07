@@ -1,26 +1,16 @@
 import { useEffect, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { useAtom } from "jotai";
 import { createPipelineWebSocket } from "@/lib/pipeline";
-import { pipelinesAtom } from "@/atoms";
-import { Pipeline } from "@/interfaces";
+import isEqual from "lodash/isEqual";
+import pick from "lodash/pick";
 
-export function usePipelineWebSocket(
-  pipelineName: string | null,
-  isRunning: boolean
-) {
+export function usePipelineWebSocket(pipelineName: string | null) {
   const queryClient = useQueryClient();
   const wsRef = useRef<WebSocket | null>(null);
-  const [, setPipelines] = useAtom(pipelinesAtom);
+  const lastDataRef = useRef<Record<string, any>>({});
 
   useEffect(() => {
-    if (!pipelineName || !isRunning) {
-      if (wsRef.current) {
-        wsRef.current.close();
-        wsRef.current = null;
-      }
-      return;
-    }
+    if (!pipelineName) return;
 
     const ws = createPipelineWebSocket(pipelineName);
     wsRef.current = ws;
@@ -35,21 +25,26 @@ export function usePipelineWebSocket(
 
         // Update the pipeline in the query cache
         if (data) {
-          // Update in react-query cache
-          queryClient.setQueryData<Pipeline>(
-            ["pipeline", pipelineName],
-            (oldData) => {
-              if (!oldData) return data;
-              return { ...oldData, ...data };
-            }
-          );
+          // Check if data has actually changed
+          // Extract the keys we care about for comparison (running, state, etc.)
+          const relevantKeys = ["running", "state"];
+          const currentData = pick(data, relevantKeys);
+          const previousData = pick(lastDataRef.current, relevantKeys);
 
-          // Update in pipelines atom
-          setPipelines((currentPipelines) =>
-            currentPipelines.map((p) =>
-              p.name === pipelineName ? { ...p, ...data } : p
-            )
-          );
+          // Compare using lodash's deep equality check
+          if (!isEqual(currentData, previousData)) {
+            // Store current data for future comparisons
+            lastDataRef.current = { ...data };
+
+            // Update React Query cache to trigger UI updates
+            queryClient.invalidateQueries({
+              queryKey: ["pipeline", pipelineName],
+            });
+
+            queryClient.invalidateQueries({
+              queryKey: ["pipelines"],
+            });
+          }
         }
       } catch (err) {
         console.error("Error parsing WebSocket message:", err);
@@ -66,16 +61,6 @@ export function usePipelineWebSocket(
         event.code,
         event.reason
       );
-
-      // Reconnect logic
-      if (isRunning && event.code !== 1000 && event.code !== 1005) {
-        setTimeout(() => {
-          if (isRunning && pipelineName) {
-            // Reconnect
-            wsRef.current = createPipelineWebSocket(pipelineName);
-          }
-        }, 3000);
-      }
     };
 
     return () => {
@@ -84,7 +69,7 @@ export function usePipelineWebSocket(
         wsRef.current = null;
       }
     };
-  }, [pipelineName, isRunning, queryClient, setPipelines]);
+  }, [pipelineName, queryClient]);
 
   // Return methods to interact with the WebSocket if needed
   return {

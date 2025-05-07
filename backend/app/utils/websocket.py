@@ -5,6 +5,7 @@ from typing import Any, Dict, List, Set
 
 from fastapi import WebSocket
 
+from lib.pipelines import PipelineFactory
 from lib.utils.logger import get_logger
 
 from ..config import config
@@ -343,9 +344,38 @@ class ConnectionManager:
         This method is called during API startup to initialize
         background tasks for Redis subscription.
         """
+        # Start pipeline monitoring task
+        monitor_task = asyncio.create_task(self.monitor_pipelines())
+        self.tasks.append(monitor_task)
+
         # This method is called from the API startup event
         # Any existing connections will have their subscription tasks started on connect
         logger.info("WebSocket manager background tasks started")
+
+    async def monitor_pipelines(self) -> None:
+        """Background task to monitor pipeline status changes and broadcast updates."""
+        logger.info("Starting pipeline status monitoring task")
+        while True:
+            try:
+                # Get all pipeline names that have active connections
+                pipeline_names = list(self.pipeline_connections.keys())
+
+                for pipeline_name in pipeline_names:
+                    if not self.pipeline_connections[pipeline_name]:
+                        continue  # Skip if no connections for this pipeline
+
+                    # Get current status and broadcast to all connected clients
+                    status = PipelineFactory.get_status(pipeline_name)
+                    if isinstance(status, dict):
+                        await self.broadcast_pipeline_update(pipeline_name, status)
+                    else:
+                        logger.warning(f"Received non-dict status for pipeline {pipeline_name}: {type(status)}")
+
+                # Check every 0.5 seconds
+                await asyncio.sleep(0.5)
+            except Exception as e:
+                logger.error(f"Error in pipeline monitor: {e}", exc_info=True)
+                await asyncio.sleep(1)  # In case of error, wait a bit longer
 
     async def close_pipeline_connections(self, pipeline_name: str) -> None:
         """Close all WebSocket connections for a specific pipeline.
