@@ -26,8 +26,10 @@ class PipelineState(Enum):
 class PipelineSignal(Enum):
     """Enum representing signals that can be sent to the pipeline."""
 
+    RESET_ARM = "reset_arm"
+    RE_CALIBRATE = "re_calibrate"
     CALIBRATION_CONFIRMED = "calibration_confirmed"
-    START_PICK_PLACE = "start_pick_place"
+    PICK_PLACE = "pick_place"
     STOP = "stop"
 
 
@@ -49,8 +51,9 @@ class YahboomPickAndPlacePipeline(BasePipeline):
     3. PICKING_PLACING: Picks and places detected objects
 
     User signals:
+    - "reset_arm": Reset the robot arm
     - "calibration_confirmed": Transition from CALIBRATING to DETECTING
-    - "start_pick_place": Transition from DETECTING to PICKING_PLACING
+    - "pick_place": Transition from DETECTING to PICKING_PLACING
     - "stop": Stop the pipeline
     """
 
@@ -84,6 +87,11 @@ class YahboomPickAndPlacePipeline(BasePipeline):
 
         # Call parent constructor - this will start the pipeline thread
         super().__init__(pipeline_name=pipeline_name, config_override=config_override, debug=debug)
+
+        self.dataloader_handler = self.handlers.get("dataloader", None)
+        self.calibrate_handler = self.handlers.get("calibrate", None)
+        self.detect_handler = self.handlers.get("detect", None)
+        self.arm_control_handler = self.handlers.get("armcontrol", None)
 
     @classmethod
     def get_available_signals(cls) -> List[str]:
@@ -145,11 +153,20 @@ class YahboomPickAndPlacePipeline(BasePipeline):
         """
         logger.info(f"Handling signal: {signal} in state: {self.state.value}")
 
+        if signal == PipelineSignal.RESET_ARM.value:
+            logger.info("Resetting arm")
+            self.arm_control_handler.handler._reset()
+
+        if signal == PipelineSignal.RE_CALIBRATE.value:
+            logger.info("Re-calibrating")
+            self.arm_control_handler.handler._reset()
+            self.state = PipelineState.CALIBRATING
+
         if signal == PipelineSignal.CALIBRATION_CONFIRMED.value and self.state == PipelineState.CALIBRATING:
             logger.info("Calibration confirmed, transitioning to detection state")
             self.state = PipelineState.DETECTING
 
-        elif signal == PipelineSignal.START_PICK_PLACE.value and self.state == PipelineState.DETECTING:
+        elif signal == PipelineSignal.PICK_PLACE.value and self.state == PipelineState.DETECTING:
             logger.info("Starting pick and place operation")
             self.state = PipelineState.PICKING_PLACING
 
@@ -165,6 +182,9 @@ class YahboomPickAndPlacePipeline(BasePipeline):
         """
         # Skip processing if in IDLE or STOPPED state
         if self.state == PipelineState.IDLE:
+            # Initialize the robot arm
+            self.arm_control_handler.handler._reset()
+
             # Initialize to calibration state on first step
             self.state = PipelineState.CALIBRATING
             logger.info("Pipeline initialized to calibration state")
@@ -189,8 +209,8 @@ class YahboomPickAndPlacePipeline(BasePipeline):
         elif self.state == PipelineState.DETECTING:
             self._process_detection()
 
-        # elif self.state == PipelineState.PICKING_PLACING:
-        #     self._process_pick_and_place()
+        elif self.state == PipelineState.PICKING_PLACING:
+            self._process_pick_and_place()
 
     def _get_latest_frame(self) -> None:
         """Get the latest frame from the dataloader handler.
@@ -198,7 +218,7 @@ class YahboomPickAndPlacePipeline(BasePipeline):
         Uses the dataloader handler to receive a new frame and
         updates self.current_frame with the result.
         """
-        if "dataloader" not in self.handlers:
+        if self.dataloader_handler is None:
             logger.warning("DataLoader handler not available")
             return
 
@@ -207,7 +227,7 @@ class YahboomPickAndPlacePipeline(BasePipeline):
             process_params = self.config.get("dataloader", {}).get("process", {})
 
             # Process frame with dataloader handler
-            result = self.handlers["dataloader"].process(**process_params)
+            result = self.dataloader_handler.process(**process_params)
 
             if result and "frame" in result:
                 self.current_frame = result["frame"]
@@ -236,7 +256,7 @@ class YahboomPickAndPlacePipeline(BasePipeline):
 
     def _process_calibration(self) -> None:
         """Process the current frame with the calibration handler."""
-        if "calibrate" not in self.handlers:
+        if self.calibrate_handler is None:
             logger.warning("Calibration handler not available")
             return
 
@@ -245,7 +265,7 @@ class YahboomPickAndPlacePipeline(BasePipeline):
             process_params = self.config.get("calibrate", {}).get("process", {})
 
             # Process frame with calibration handler
-            result = self.handlers["calibrate"].process(self.current_frame, debug=self.debug, **process_params)
+            result = self.calibrate_handler.process(self.current_frame, debug=self.debug, **process_params)
 
             # Store the perspective transformation matrix
             if result and "pt_matrix" in result:
@@ -262,7 +282,7 @@ class YahboomPickAndPlacePipeline(BasePipeline):
 
     def _process_detection(self) -> None:
         """Process the current frame with the detection handler."""
-        if "detect" not in self.handlers:
+        if self.detect_handler is None:
             logger.warning("Detection handler not available")
             return
 
@@ -274,19 +294,26 @@ class YahboomPickAndPlacePipeline(BasePipeline):
             frame_to_process = self.current_pt_frame if self.current_pt_frame is not None else self.current_frame
 
             # Process frame with detection handler - returns a list of detections directly
-            self.detected_objects = self.handlers["detect"].process(
-                frame_to_process, debug=self.debug, **process_params
-            )
+            result = self.detect_handler.process(frame_to_process, debug=self.debug, **process_params)
 
-            if self.detected_objects:
-                logger.info(f"Detected {len(self.detected_objects)} objects")
+            if result and "detections" in result:
+                self.detected_objects = result["detections"]
+
+                # if self.detected_objects:
+                #     logger.info(f"Detected {len(self.detected_objects)} objects")
+
+                self.publish_to_queue(
+                    PipelineQueue.DETECTION_FRAMES.value,
+                    {"frame": self._encode_frame(result["processed_frame"])},
+                )
+
         except Exception as e:
             logger.error(f"Error in detection processing: {e}")
             self.detected_objects = []
 
     def _process_pick_and_place(self) -> None:
         """Process pick and place operation with the arm control handler."""
-        if "armcontrol" not in self.handlers:
+        if self.arm_control_handler is None:
             logger.warning("Arm control handler not available")
             return
 
@@ -300,6 +327,16 @@ class YahboomPickAndPlacePipeline(BasePipeline):
             process_params = self.config.get("armcontrol", {}).get("process", {})
 
             # Process objects with arm control handler
-            self.handlers["armcontrol"].process(self.detected_objects, debug=self.debug, **process_params)
+            result = self.arm_control_handler.process(self.detected_objects, debug=self.debug, **process_params)
+            failed = result.get("failed", [])
+
+            if failed:
+                logger.info(
+                    f"Failed to pick and place {len(failed)} objects: {','.join([obj['label'] for obj in failed])}"
+                )
+
+            logger.info("Pick and place tried, back to detection state")
+            self.state = PipelineState.DETECTING
+
         except Exception as e:
             logger.error(f"Error in pick and place operation: {e}")

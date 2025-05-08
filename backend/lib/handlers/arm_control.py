@@ -1,7 +1,7 @@
 import time
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
-from pymycobot import MyCobot280
+from pymycobot import MyCobot280, MyCobot280Socket
 from pymycobot.genre import Coord
 
 from ..utils.logger import get_logger
@@ -21,20 +21,24 @@ class ArmControlHandler:
 class YahboomArmControlHandler:
     def __init__(
         self,
+        remote_addr: Optional[str] = None,
+        remote_port: Optional[int] = 9000,
+        port: str = "/dev/ttyUSB0",
+        baudrate: int = 1000000,
         task: str = "pick_and_place",
-        grasp_offset: Tuple[float, float] = (0.005, 0),
-        init_angles: List[int] = [39, 0, 0, -71, -8, -8],
+        grasp_offset: Tuple[float, float] = (-0.02, -0.005),
+        init_angles: List[int] = [43, 0, 0, -80, -6, -6],
         coord_config: Dict[str, Any] = {
-            "pre_grasp_z": 170,
-            "grasp_z": 115,
-            "post_grasp_z": 170,
+            "pre_grasp_z": 180,
+            "grasp_z": 130,
+            "post_grasp_z": 250,
             "place": {
-                "red": [75, 230, 115, -175, 0, -45],
-                "green": [10, 230, 115, -175, 0, -45],
-                "blue": [-70, 230, 115, -175, 0, -45],
-                "yellow": [140, 230, 115, -175, 0, -45],
+                "red": [75, 230, 130, -175, 0, -45],
+                "green": [10, 230, 130, -175, 0, -45],
+                "blue": [-70, 230, 130, -175, 0, -45],
+                "yellow": [140, 230, 130, -175, 0, -45],
             },
-            "stack": {"first": [135, -155, 115, -175, 0, -45], "delta_z": 30},
+            "stack": {"first": [135, -155, 130, -175, 0, -45], "delta_z": 30},
         },
         gripper_config: Dict[str, int] = {
             "open": 100,
@@ -43,7 +47,7 @@ class YahboomArmControlHandler:
     ) -> None:
         self.task = task
         self.grasp_offset = grasp_offset
-        self.mc = MyCobot280(port="/dev/ttyUSB0", baudrate=1000000)
+        self.mc = MyCobot280Socket(remote_addr, remote_port) if remote_addr else MyCobot280(port, baudrate)
         self.init_angles = init_angles
         self.coord_config = coord_config
         self.gripper_config = gripper_config
@@ -91,21 +95,26 @@ class YahboomArmControlHandler:
             cx, cy = obj["center"]
 
             if cx > 0.275:
-                logger.info(f"{label} at {cx:.2f}, {cy:.2f} unreachable")
+                logger.info(f"{label} at {cx:.3f}, {cy:.3f} unreachable")
                 failed.append(obj)
                 continue
 
-            logger.info(f"Moving to {label} at {cx:.2f}, {cy:.2f}")
+            logger.info(f"Moving to {label} at {cx:.3f}, {cy:.3f}")
             cx += self.grasp_offset[0]
             cy += self.grasp_offset[1]
 
+            cx *= 1000
+            cy *= 1000
+
             self._move_to_coord(cx, cy, self.coord_config["pre_grasp_z"], speed=speed, delay=delay)
 
-            self._move_to_z(self.coord_config["grasp_z"], speed=speed, delay=delay)
+            self._set_gripper_value(self.gripper_config["open"], speed=speed, delay=delay)
+
+            self._move_to_coord(cx, cy, self.coord_config["grasp_z"], speed=speed, delay=delay)
 
             self._set_gripper_value(self.gripper_config["close"], speed=speed, delay=delay)
 
-            self._move_to_z(self.coord_config["post_grasp_z"], speed=speed, delay=delay)
+            self._move_to_coord(cx, cy, self.coord_config["post_grasp_z"], speed=speed, delay=delay)
 
             if self.task == "pick_and_place":
                 coords = self.coord_config["place"][label]
@@ -115,14 +124,16 @@ class YahboomArmControlHandler:
 
             x, y, z, rx, ry, rz = coords
 
+            self._move_to_coord(x, y, self.coord_config["pre_grasp_z"], speed=speed, delay=delay)
+
             self._move_to_coord(x, y, z, rx, ry, rz, speed=speed, delay=delay)
 
             self._set_gripper_value(self.gripper_config["open"], speed=speed, delay=delay)
 
-            self._move_to_coord(x, y, z + 30, rx, ry, rz, speed=speed, delay=delay)
+            self._move_to_coord(x, y, z + 50, rx, ry, rz, speed=speed, delay=delay)
 
             self._reset()
 
-            done.append(label)
+            done.append(obj)
 
         return {"done": done, "failed": failed}
