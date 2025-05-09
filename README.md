@@ -10,21 +10,36 @@ A modular system for controlling robot arms with computer vision integration. Th
 - **FastAPI Integration**: Modern web API for controlling pipelines and sending signals
 - **Process Management**: Multi-process architecture for reliable pipeline execution
 - **Redis Integration**: Non-blocking image streaming with memory management
-- **Configurable**: Adjust for different robot setups, detection parameters, and tasks
+- **WebSocket Integration**: Real-time updates and data streaming to the frontend
+- **Configurable**: Factory-based handler system with layered configuration
 - **Modern Web Dashboard**: Next.js frontend for monitoring and controlling the system
 
 ## Project Structure
 
 - `backend/`: Server-side implementation
   - `app/`: FastAPI application and endpoints
+    - `api/`: REST and WebSocket endpoints
+    - `utils/`: Helper utilities including WebSocket manager
+    - `config.py`: Central configuration loader
   - `lib/`: Core functionality
     - `pipelines/`: Pipeline implementations with process-based architecture
-    - `handlers/`: Specialized handlers for vision and robot control
+      - `base.py`: Abstract base class for pipelines
+      - `factory.py`: Pipeline registration and creation
+      - `manager.py`: Multi-process pipeline management
+      - `process.py`: Process encapsulation for pipelines
+      - `yahboom/`: Pipeline-specific implementation with handlers
+    - `handlers/`: Handler framework
+      - `base.py`: Handler interface definition
+      - `factory.py`: Handler registration and creation
+      - `data_loader.py`: Data loading handlers (Redis, ImageZMQ)
     - `utils/`: Helper functions and utilities
-  - `config/`: Configuration files for different environments
+  - `config/`: Environment-specific configuration files
 - `frontend/`: Next.js dashboard
-  - Modern UI for monitoring and controlling pipelines
-  - WebSocket integration for real-time updates
+  - `src/`: Source code
+    - `app/`: Next.js app router components
+    - `components/`: Reusable UI components
+    - `lib/`: Utility functions and API client
+    - `hooks/`: Custom React hooks for data and WebSockets
 - `examples/`: Client-side demonstration code
 - `.hooks/`: Project-wide git hooks
 - `docs/`: Documentation files
@@ -36,6 +51,7 @@ A modular system for controlling robot arms with computer vision integration. Th
 - Python 3.8 or newer
 - USB connection to the robot arm (for control functionality)
 - Camera (USB webcam, IP camera, or video file)
+- Redis server (for data streaming and pipeline communication)
 
 ### Installation
 
@@ -67,12 +83,21 @@ A modular system for controlling robot arms with computer vision integration. Th
 1. Connect the Yahboom MyCobot 280 to your computer via USB
 2. The default port is set to `/dev/ttyUSB0`. If your robot is connected to a different port, you'll need to specify it in your configuration.
 
-### Configuration
+### Configuration System
 
-The system uses YAML configuration files located in the `backend/config/` directory:
+The system employs a multi-layered configuration approach:
 
-- `dev.yaml`: Development environment configuration
-- `prod.yaml`: Production environment configuration
+1. **Pipeline Default Configuration**:
+   - Located in `lib/pipelines/[pipeline_type]/config.yaml`
+   - Defines default settings for each pipeline type
+   - Includes handler initialization and processing parameters
+   - Contains debug settings for individual handlers
+
+2. **Environment Overrides**:
+   - Located in `config/[env].yaml` (e.g., `dev.yaml`, `prod.yaml`)
+   - Contains environment-specific overrides
+   - Selected via the `ENV` environment variable
+   - Lists all available pipelines in the environment
 
 You can copy the example files to create your own configurations:
 
@@ -86,19 +111,20 @@ Edit these files to adjust settings like:
 - Image processing parameters
 - Pipeline default behaviors
 - Redis connection settings
+- Debug settings for specific handlers
 
 ### Starting the Backend Server
 
-Start the server in debug mode:
+Start the server:
 
 ```bash
-DEBUG=true python train.py
+python main.py
 ```
 
-For additional control, you can specify a pipeline:
+You can specify the environment and initial pipeline:
 
 ```bash
-PIPELINE=yahboom_pick_and_place DEBUG=true python train.py
+ENV=dev PIPELINE=yahboom_pick_and_place python main.py
 ```
 
 ### Running the Streaming Client
@@ -106,7 +132,7 @@ PIPELINE=yahboom_pick_and_place DEBUG=true python train.py
 To stream video to the system:
 
 ```bash
-python -m examples.streaming --source /path/to/video.mp4 --keep_size --lossless --enable_freeze --visualization --max-frames 100 --time-window 2
+python -m examples.streaming --source webcam:0 --keep_size --lossless --enable_freeze --visualization --max-frames 100 --time-window 0.1
 ```
 
 Options:
@@ -122,22 +148,34 @@ Options:
 
 The system exposes the following API endpoints:
 
-- `GET /pipelines`: List all available and running pipelines
-- `POST /pipelines/start`: Start a specific pipeline
-- `POST /pipelines/stop`: Stop a running pipeline
-- `POST /signal`: Send a signal to a running pipeline
-- `GET /status`: Get detailed status information for a pipeline
+- `GET /pipelines`: List all available pipelines defined in the config file (running and non-running)
+- `GET /pipeline`: Get detailed information about a specific pipeline
+- `POST /pipeline/start`: Start a specific pipeline
+- `POST /pipeline/stop`: Stop a running pipeline
+- `POST /pipeline/signal`: Send a signal to a running pipeline
 
-### Example Request
+### WebSocket Endpoints
+
+For real-time updates and data streaming:
+
+- `ws/pipeline`: Stream real-time pipeline state updates and events
+- `ws/queue`: Stream real-time frame data and processing results
+
+#### WebSocket Connection Parameters
+
+- Pipeline WebSocket: `ws://host:port/ws/pipeline?pipeline_name=<pipeline_name>`
+- Queue WebSocket: `ws://host:port/ws/queue?pipeline_name=<pipeline_name>&queue_name=<queue_name>`
+
+### Example Requests
 
 Start a pipeline:
 ```bash
-curl -X POST "http://localhost:8000/pipelines/start" -H "Content-Type: application/json" -d '{"pipeline_name": "yahboom_pick_and_place", "debug": true}'
+curl -X POST "http://localhost:8000/pipeline/start?pipeline_name=yahboom_pick_and_place" -H "Content-Type: application/json"
 ```
 
 Send a signal:
 ```bash
-curl -X POST "http://localhost:8000/signal?pipeline_name=yahboom_pick_and_place" -H "Content-Type: application/json" -d '{"signal": "pick_red", "priority": "HIGH"}'
+curl -X POST "http://localhost:8000/pipeline/signal?pipeline_name=yahboom_pick_and_place&signal_name=pick_red&priority=HIGH" -H "Content-Type: application/json"
 ```
 
 ## Frontend Setup
@@ -148,6 +186,8 @@ curl -X POST "http://localhost:8000/signal?pipeline_name=yahboom_pick_and_place"
 - **TypeScript**: Type-safe JavaScript
 - **Tailwind CSS**: Utility-first CSS framework
 - **Shadcn/UI**: High-quality, accessible UI components
+- **React Query**: Data fetching and state management
+- **Jotai**: Lightweight state management
 
 ### Architecture
 
@@ -186,10 +226,10 @@ bun run start
 ### Features
 
 - Pipeline management (list, start, stop)
-- Configuration editing
-- Signal control
-- Real-time frame visualization
-- Status monitoring
+- Signal control with available signals list
+- Real-time pipeline status monitoring
+- Real-time frame visualization from pipeline queues
+- Responsive layout for different devices
 
 ## Git Hooks Setup
 
@@ -218,6 +258,9 @@ This two-step process ensures that both frontend and backend hooks are properly 
 
 ## Next Steps
 
+- **Pipeline Configuration UI**: Add interfaces for modifying pipeline configurations
+- **Enhanced Visualization**: Add controls for display options and multi-queue visualization
+- **User Authentication**: Add secure access with role-based permissions
 - **Additional Robot Models**: Support for different robot arm models and configurations
-- **Enhanced UI Features**: Expand dashboard capabilities for better visualization and control
+- **Performance Optimizations**: Improve frame rate control and network efficiency
 - **Real-time Analytics**: Add metrics and performance monitoring

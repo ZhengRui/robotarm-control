@@ -13,6 +13,7 @@ The core of the Modulus Robot Arm Control system is its pipeline architecture, w
 - **State Machine**: Pipelines function as state machines with well-defined transitions
 - **Signal-driven**: External signals trigger state changes and actions
 - **Priority-based**: Critical signals (e.g., emergency stop) are processed first
+- **Factory-based**: Pipeline and handler creation via a centralized factory system
 
 ## Key Components
 
@@ -20,6 +21,28 @@ The core of the Modulus Robot Arm Control system is its pipeline architecture, w
 - [backend/lib/pipelines/factory.py](mdc:backend/lib/pipelines/factory.py) - Factory for creating pipeline instances
 - [backend/lib/pipelines/manager.py](mdc:backend/lib/pipelines/manager.py) - Manages multiple pipeline processes
 - [backend/lib/pipelines/process.py](mdc:backend/lib/pipelines/process.py) - Encapsulates a pipeline in a separate process
+- [backend/lib/handlers/factory.py](mdc:backend/lib/handlers/factory.py) - Factory for handler registration and creation
+
+## Factory-Based Component Architecture
+
+```
+┌───────────────┐     ┌─────────────────┐     ┌────────────────┐
+│               │     │                 │     │                │
+│ Pipeline      │◄────┤ PipelineFactory │     │ HandlerFactory │
+│ Implementation│     │                 │     │                │
+│               │     └─────────────────┘     └────────────────┘
+│               │                                      │
+│               │◄─────────────────────────────────────┘
+│               │
+└───────────────┘
+```
+
+Benefits of this approach:
+- Clean separation between interface and implementation
+- Type-safe creation of specialized components
+- Runtime extensibility with new implementations
+- Centralized registration and configuration
+- Support for pipeline-specific handlers
 
 ## Pipeline Flow
 
@@ -53,3 +76,13 @@ Each pipeline step processes data through a chain of handlers:
 │ Handler        │     │ Handler        │     │ Handler        │
 └────────────────┘     └────────────────┘     └────────────────┘
 ```
+
+## Handler System
+
+The handler system provides specialized processing components:
+
+- **HandlerFactory**: Central registration point for all handlers
+- **Pipeline-specific Handlers**: Registered for specific pipeline types
+- **Common Handlers**: Available to all pipeline types
+- **Initialization**: Handlers created from configuration with typed parameters
+- **Process Flow**: Each handler has a `process()` method for data manipulation

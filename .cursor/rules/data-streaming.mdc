@@ -5,18 +5,18 @@ alwaysApply: false
 ---
 # Data Streaming System
 
-The Modulus Robot Arm Control system implements two interchangeable backends for image data streaming.
+The Modulus Robot Arm Control system implements two interchangeable backends for image data streaming and WebSocket integration for frontend communication.
 
 ## Architecture Overview
 
 ```
-┌───────────────┐                     ┌───────────────┐
-│               │      ImageZMQ       │               │
-│  Streaming    ├────────────────────►│  Pipeline     │
-│  Client       │                     │  Process      │
-│               │       Redis         │               │
-│               ├────────────────────►│               │
-└───────────────┘                     └───────────────┘
+┌───────────────┐                     ┌───────────────┐                     ┌───────────────┐
+│               │      ImageZMQ       │               │                     │               │
+│  Streaming    ├────────────────────►│  Pipeline     │                     │  WebSocket    │
+│  Client       │                     │  Process      │                     │  Clients      │
+│               │       Redis         │               │       WebSockets    │               │
+│               ├────────────────────►│               ├────────────────────►│               │
+└───────────────┘                     └───────────────┘                     └───────────────┘
 ```
 
 ## Implementation Components
@@ -33,6 +33,13 @@ The Modulus Robot Arm Control system implements two interchangeable backends for
 - **ImageZMQDataLoaderHandler**: For backward compatibility
 - **RedisDataLoaderHandler**: Non-blocking implementation with timeout support
 
+### WebSocket Bridge
+- [backend/app/utils/websocket.py](mdc:backend/app/utils/websocket.py) - WebSocket connection manager
+- [backend/app/api/ws_routes.py](mdc:backend/app/api/ws_routes.py) - WebSocket endpoint routes
+- **ConnectionManager**: Manages WebSocket connections and subscriptions
+- **Pipeline status updates**: `/ws/pipeline` endpoint
+- **Queue data streaming**: `/ws/queue` endpoint
+
 ## Key Features
 
 ### Redis Implementation Benefits
@@ -40,15 +47,30 @@ The Modulus Robot Arm Control system implements two interchangeable backends for
 - **Non-blocking Operation**:
   - Timeouts allow the pipeline to check for shutdown signals
   - Improved responsiveness to control commands
+  - Better pipeline termination handling
 
 - **Memory Management**:
   - Prevents memory leaks via configurable limits
   - Frame count limiting with `max_frames`
   - Time-based expiration with `time_window`
+  - Automatic cleanup of outdated frames
 
 - **Reliability**:
   - Connection handling for network environments
   - Better fault tolerance
+  - Support for multiple consumers of the same stream
+
+### WebSocket Integration
+
+- **Real-time Updates**:
+  - Immediate pipeline status updates to connected clients
+  - Live visualization of camera frames and processing results
+
+- **Connection Management**:
+  - Connection lifecycle handling (connect, disconnect)
+  - Background tasks for Redis subscriptions
+  - Error handling and automatic reconnection
+  - Efficient multiplexing to multiple clients
 
 ### Data Format
 

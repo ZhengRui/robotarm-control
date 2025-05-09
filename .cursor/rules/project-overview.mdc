@@ -16,10 +16,17 @@ This repository contains the Modulus Robot Arm Control system, a modular framewo
 
 - [backend/](mdc:backend) - Python-based server implementation with FastAPI
   - [backend/app/](mdc:backend/app) - FastAPI application and endpoints
+    - [backend/app/api/](mdc:backend/app/api) - REST and WebSocket endpoints
+    - [backend/app/utils/](mdc:backend/app/utils) - Helper utilities including WebSocket manager
   - [backend/lib/](mdc:backend/lib) - Core functionality including pipelines and handlers
+    - [backend/lib/pipelines/](mdc:backend/lib/pipelines) - Pipeline implementations and factory
+    - [backend/lib/handlers/](mdc:backend/lib/handlers) - Handler framework with factory pattern
   - [backend/config/](mdc:backend/config) - Configuration files for different environments
 - [frontend/](mdc:frontend) - Next.js dashboard for monitoring and controlling the system
   - [frontend/src/](mdc:frontend/src) - Source code for the frontend application
+    - [frontend/src/app/](mdc:frontend/src/app) - Next.js app router components
+    - [frontend/src/components/](mdc:frontend/src/components) - Reusable UI components
+    - [frontend/src/hooks/](mdc:frontend/src/hooks) - Custom React hooks for data and WebSockets
 - [docs/](mdc:docs) - Documentation files
   - [docs/design.md](mdc:docs/design.md) - Detailed system architecture design
   - [docs/status.md](mdc:docs/status.md) - Current project status report

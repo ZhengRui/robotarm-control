@@ -20,9 +20,13 @@ The backend system follows a pipeline-based architecture for robot arm control w
   - Each pipeline runs in its own process for stability
   - Uses priority-based signal handling for responsive control
   - Implements state machine pattern for predictable transitions
+  - Factory pattern for pipeline registration and creation
 
 ### Handler System
 - [backend/lib/handlers/](mdc:backend/lib/handlers) - Specialized processing modules
+  - **Factory-based architecture**: Handlers are registered and created via HandlerFactory
+  - **Pipeline-specific handlers**: Each pipeline type can register custom handlers
+  - **Common handlers**: Shared handlers available to all pipelines
   - **DataLoaderHandler**: Loads images from streams (ImageZMQ or Redis)
   - **DetectHandler**: Identifies objects in frames
   - **ArmControlHandler**: Controls the robot arm
@@ -32,11 +36,21 @@ The backend system follows a pipeline-based architecture for robot arm control w
   - Provides RESTful interface for controlling pipelines
   - Handles signal transmission with priority levels
   - Manages pipeline lifecycle (start/stop)
+  - WebSocket endpoints for real-time updates
+
+### WebSocket System
+- [backend/app/utils/websocket.py](mdc:backend/app/utils/websocket.py) - WebSocket management
+  - **ConnectionManager**: Central WebSocket connection management
+  - **Pipeline Status WebSocket**: Real-time state updates
+  - **Queue Data WebSocket**: Streaming frame data and processing results
+  - Redis bridge for connecting pipeline data to WebSocket clients
 
 ### Configuration
 - [backend/config/](mdc:backend/config) - YAML configuration files
   - Environment-specific settings (dev.yaml, prod.yaml)
   - Pipeline and handler configuration
+  - Multi-layered configuration approach
+  - Per-handler debug settings
 
 ## Data Flow
 1. Image frames are received via ImageZMQ or Redis
@@ -44,3 +58,4 @@ The backend system follows a pipeline-based architecture for robot arm control w
 3. Object information is passed to the ArmControlHandler
 4. The robot arm executes actions based on detected objects
 5. The pipeline reports status back to the API layer
+6. WebSocket connections stream updates to frontend clients

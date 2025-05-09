@@ -85,7 +85,30 @@ This ensures:
 - Background operations don't interfere with time-sensitive commands
 - The system can handle bursts of signals while maintaining responsiveness
 
-### 4. Dual Backend Data Streaming Architecture
+### 4. Factory-Based Component Architecture
+
+The system employs a factory pattern for creating pipeline and handler instances:
+
+```
+┌───────────────┐     ┌─────────────────┐     ┌────────────────┐
+│               │     │                 │     │                │
+│ Pipeline      │◄────┤ PipelineFactory │     │ HandlerFactory │
+│ Implementation│     │                 │     │                │
+│               │     └─────────────────┘     └────────────────┘
+│               │                                      │
+│               │◄─────────────────────────────────────┘
+│               │
+└───────────────┘
+```
+
+Benefits of this approach:
+- Clean separation between interface and implementation
+- Type-safe creation of specialized components
+- Runtime extensibility with new implementations
+- Centralized registration and configuration
+- Support for pipeline-specific handlers
+
+### 5. Dual Backend Data Streaming Architecture
 
 The system supports two interchangeable backends for image data streaming:
 
@@ -105,6 +128,25 @@ This design provides:
 - Enhanced performance and reliability with Redis
 - Seamless transition between backends with consistent APIs
 
+### 6. WebSocket Real-Time Communication
+
+The system implements WebSocket connections for real-time data and status updates:
+
+```
+┌───────────────┐     ┌───────────────┐     ┌───────────────┐
+│               │     │               │     │               │
+│  Pipeline     │────►│  Redis        │────►│  WebSocket    │────►Browser
+│  Process      │     │  Server       │     │  Connection   │
+│               │     │               │     │               │
+└───────────────┘     └───────────────┘     └───────────────┘
+```
+
+This architecture enables:
+- Real-time update streaming without polling
+- Efficient bidirectional communication
+- Pipeline status and frame data visualization
+- Multiple clients monitoring the same pipeline
+
 ## Component Hierarchy
 
 ### Layer 1: FastAPI Server (API Layer)
@@ -112,14 +154,15 @@ This design provides:
 The FastAPI server provides the external interface to the system:
 
 ```
-┌────────────────────────────────────────────────────┐
-│ FastAPI Server                                     │
-│                                                    │
-│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐ │
-│  │ GET /status │  │ POST /signal│  │ GET /pipelines│
-│  └─────────────┘  └─────────────┘  └─────────────┘ │
-│                                                    │
-└────────────────────────────────────────────────────┘
+┌────────────────────────────────────────────────────────────────┐
+│ FastAPI Server                                                 │
+│                                                                │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌────────┐ │
+│  │ REST        │  │ WebSocket   │  │ Connection  │  │ Config │ │
+│  │ Endpoints   │  │ Endpoints   │  │ Manager     │  │ Loader │ │
+│  └─────────────┘  └─────────────┘  └─────────────┘  └────────┘ │
+│                                                                │
+└────────────────────────────────────────────────────────────────┘
                          │
                          ▼
             ┌────────────────────────┐
@@ -129,6 +172,9 @@ The FastAPI server provides the external interface to the system:
 
 Key responsibilities:
 - Exposing RESTful endpoints for pipeline management
+- Providing WebSocket endpoints for real-time updates
+- Managing WebSocket connections and lifecycles
+- Loading environment-specific configurations
 - Converting HTTP requests to internal method calls
 - Validating input parameters
 - Returning appropriate status codes and responses
@@ -160,7 +206,8 @@ The PipelineFactory serves as a singleton access point to the pipeline system:
 
 Key responsibilities:
 - Maintaining a registry of available pipeline types
-- Providing static methods for pipeline operations
+- Providing metadata about pipeline capabilities
+- Exposing static methods for pipeline operations
 - Abstracting the complexity of pipeline management
 - Creating a clean interface for the API layer
 
@@ -253,6 +300,10 @@ The BasePipeline defines the interface for all pipeline implementations:
 │  │ current_state       │  │ available_signals    │ │
 │  └─────────────────────┘  └──────────────────────┘ │
 │                                                    │
+│  ┌─────────────────────┐  ┌──────────────────────┐ │
+│  │ _load_config()      │  │ _initialize_handlers()│ │
+│  └─────────────────────┘  └──────────────────────┘ │
+│                                                    │
 └────────────────────────────────────────────────────┘
                          │
                          │
@@ -266,12 +317,67 @@ The BasePipeline defines the interface for all pipeline implementations:
 
 Key responsibilities:
 - Defining the pipeline interface
-- Loading configuration from YAML
-- Initializing handlers
+- Loading pipeline-specific configuration
+- Merging with environment overrides
+- Initializing handlers via HandlerFactory
 - Processing state transitions
 - Executing state-specific logic
 
-### Layer 6: Data Streaming System (Streaming Layer)
+### Layer 6: Handler System (Handler Layer)
+
+The handler system provides specialized processing components:
+
+```
+┌────────────────────────────────────────────────────┐
+│ HandlerFactory                                     │
+│                                                    │
+│  ┌─────────────────────────┐  ┌─────────────────┐  │
+│  │ register_for_pipeline() │  │ register_common()│  │
+│  └─────────────────────────┘  └─────────────────┘  │
+│                                                    │
+│  ┌─────────────────────────┐  ┌─────────────────┐  │
+│  │ get_handler_class()     │  │ create_handler()│  │
+│  └─────────────────────────┘  └─────────────────┘  │
+└────────────────────────────────────────────────────┘
+                         │
+                         ▼
+┌───────────────────────────────────────────────────────┐
+│ BaseHandler (Abstract)                                │
+│                                                       │
+│  ┌─────────────────────┐  ┌──────────────────────┐    │
+│  │ process()           │  │ init params          │    │
+│  └─────────────────────┘  └──────────────────────┘    │
+│                                                       │
+└───────────────────────────────────────────────────────┘
+                         │
+                         │
+     ┌──────────────────┴───────────┬─────────────────────┐
+     │                              │                     │
+┌────▼────────┐  ┌────────────────┐ │  ┌─────────────────┐│
+│ DataLoader  │  │ Pipeline-      │ │  │ Common          ││
+│ Handlers    │  │ Specific       │ │  │ Handlers        ││
+│             │  │ Handlers       │ │  │                 ││
+└─────────────┘  └────────────────┘ │  └─────────────────┘│
+                                   ▼                      │
+┌───────────────────────────────────────────────────────┐ │
+│ Handler Implementation                                │ │
+│                                                       │ │
+│  ┌─────────────────────┐  ┌──────────────────────┐    │ │
+│  │ process()           │  │ specialized methods   │    │ │
+│  └─────────────────────┘  └──────────────────────┘    │ │
+│                                                       │ │
+└───────────────────────────────────────────────────────┘ │
+                                                         ▼
+```
+
+Key responsibilities:
+- Providing a factory for handler registration and creation
+- Supporting pipeline-specific and common handlers
+- Encapsulating specialized processing logic
+- Enabling dynamic configuration via the pipeline config system
+- Creating a pluggable architecture for pipeline components
+
+### Layer 7: Data Streaming System (Streaming Layer)
 
 The data streaming system provides interfaces for sending and receiving image data:
 
@@ -302,11 +408,45 @@ Key responsibilities:
 - Implementing memory management for queues
 - Supporting metadata with image frames
 
+### Layer 8: WebSocket Communication (WebSocket Layer)
+
+The WebSocket layer provides real-time communication with clients:
+
+```
+┌────────────────────────────────────────────────────────────────────────┐
+│ WebSocket Layer                                                        │
+│                                                                        │
+│  ┌───────────────────────────────┐       ┌────────────────────────────┐│
+│  │ ConnectionManager             │       │ WebSocket Endpoints        ││
+│  │                               │       │                            ││
+│  │ ┌─────────────────────────┐   │       │ ┌──────────────────────┐   ││
+│  │ │ connect_pipeline()      │   │       │ │ pipeline_websocket   │   ││
+│  │ └─────────────────────────┘   │       │ └──────────────────────┘   ││
+│  │                               │       │                            ││
+│  │ ┌─────────────────────────┐   │       │ ┌──────────────────────┐   ││
+│  │ │ connect_queue()         │   │       │ │ queue_websocket      │   ││
+│  │ └─────────────────────────┘   │       │ └──────────────────────┘   ││
+│  │                               │       │                            ││
+│  │ ┌─────────────────────────┐   │       │                            ││
+│  │ │ Redis Subscriptions     │   │       │                            ││
+│  │ └─────────────────────────┘   │       │                            ││
+│  └───────────────────────────────┘       └────────────────────────────┘│
+│                                                                        │
+└────────────────────────────────────────────────────────────────────────┘
+```
+
+Key responsibilities:
+- Managing WebSocket connections and lifecycles
+- Subscribing to Redis channels for pipeline data
+- Broadcasting pipeline status and queue data to clients
+- Handling connection errors and client disconnections
+- Efficient multiplexing of data to multiple clients
+
 ## Signal Flow
 
 Signals follow a well-defined path through the system:
 
-1. **Initiation**: The API server receives a POST request to `/signal`
+1. **Initiation**: The API server receives a POST request to `/pipeline/signal`
 2. **Routing**: PipelineFactory forwards to PipelineManager
 3. **Queueing**: PipelineManager routes to the appropriate PipelineProcess
 4. **IPC**: Signal is placed in the process's signal_queue
@@ -341,31 +481,30 @@ Each handler:
 - Processes input data (frames, detected objects, etc.)
 - Updates its internal state
 - Passes processed data to the next handler
-- May publish debug information (when in debug mode)
+- May publish debug information (configured per handler)
 
 ## Configuration System
 
-The system employs a layered configuration approach with a clear hierarchy of selection and overrides:
+The system employs a multi-layered configuration approach with a clear hierarchy of defaults and overrides:
 
 ```
 ┌─────────────────────────────┐  Server Initialization Parameters
 │ Command-line Args / ENV     │  • ENV=[dev|prod]   - Selects which config to load
 │                             │  • PIPELINE=name    - Selects pipeline to auto-start
-│                             │  • DEBUG=[true|false] - Toggles debug mode
 └──────────────┬──────────────┘
                │ Selects
                ▼
 ┌─────────────────────────────┐
 │ config/{env}.yaml           │  Environment-specific pipeline configurations
-│ (dev.yaml, prod.yaml)       │  Detailed settings for handlers, backends,
-│                             │  and pipeline behaviors
+│ (dev.yaml, prod.yaml)       │  • Lists available pipelines
+│                             │  • Contains environment-specific overrides
 └──────────────┬──────────────┘
                │ Merged with
                ▼
 ┌─────────────────────────────┐
-│ lib/pipelines/default.yaml  │  System-wide pipeline defaults
-│                             │  (used for any settings not specified in
-│                             │  the environment config)
+│ lib/pipelines/{type}/       │  Pipeline-specific defaults
+│ config.yaml                 │  • Default configuration for each pipeline type
+│                             │  • Handler initialization and processing parameters
 └──────────────┬──────────────┘
                │ Applied to
                ▼
@@ -378,14 +517,20 @@ The system employs a layered configuration approach with a clear hierarchy of se
 Key points about this configuration system:
 
 • **Selection Process**:
-  - Command-line args and ENV variables determine *which* config file to load (dev/prod)
-  - They also specify which pipeline to auto-start, if any
-  - They don't override the content of config files, just select which ones to use
+  - Command-line args and ENV variables determine which environment config file to load (dev/prod)
+  - Environment config lists available pipelines and their types
+  - Each pipeline has its own default configuration in its module directory
 
 • **Configuration Merging**:
-  - The selected environment config (`config/{env}.yaml`) provides environment-specific settings
-  - Any settings not found in the environment config are taken from the system defaults
-  - The merged configuration is then used to initialize the pipeline
+  - When a pipeline is created, it loads its own default configuration
+  - Environment-specific overrides are then merged with these defaults
+  - The merger is configured to handle various data types (lists, dictionaries, scalars)
+
+• **Handler Configuration**:
+  - Each handler is configured through the pipeline configuration
+  - Handlers typically have an `init` section for constructor parameters
+  - And a `process` section for runtime parameters
+  - Handler-specific debug settings can be configured per handler
 
 • **Server Startup Behavior**:
   - If the `PIPELINE` environment variable is set, the specified pipeline starts automatically
@@ -394,7 +539,7 @@ Key points about this configuration system:
 
 • **API Control**:
   - Regardless of initialization, pipelines can be started, stopped, and managed via API endpoints
-  - `/pipelines/start`, `/pipelines/stop`, `/signal`, etc.
+  - `/pipeline/start`, `/pipeline/stop`, `/pipeline/signal`, etc.
 
 ## Redis Integration
 
@@ -457,54 +602,109 @@ The Redis integration delivers several important benefits:
    - Built-in handling for connection issues
    - Greater fault tolerance in network environments
 
-## Future Development
+## WebSocket Integration
 
-### 1. Web-based Visualization UI
+### Design Overview
 
-The planned web UI will provide:
-
-```
-┌────────────────────────────────────────────────────────┐
-│ Web UI                                                 │
-│                                                        │
-│  ┌─────────────────┐    ┌──────────────────────────┐   │
-│  │ Pipeline Control│    │ Handler Visualization    │   │
-│  │                 │    │                          │   │
-│  │ ┌─────────────┐ │    │ ┌──────────┐ ┌─────────┐ │   │
-│  │ │ Start/Stop  │ │    │ │ Camera   │ │ Object  │ │   │
-│  │ └─────────────┘ │    │ │ Feed     │ │ Detect  │ │   │
-│  │                 │    │ └──────────┘ └─────────┘ │   │
-│  │ ┌─────────────┐ │    │                          │   │
-│  │ │ Signals     │ │    │ ┌─────────────────────┐  │   │
-│  │ └─────────────┘ │    │ │ Arm Control Status  │  │   │
-│  └─────────────────┘    │ └─────────────────────┘  │   │
-│                         └──────────────────────────┘   │
-└────────────────────────────────────────────────────────┘
-```
-
-This will enable:
-- Remote monitoring and control
-- Visualization of processing steps
-- Debugging assistance
-- System status overview
-
-### 2. Real-time Data Streaming
-
-Using Redis Pub/Sub for streaming intermediate results:
+The system implements WebSocket connections for real-time updates to web clients:
 
 ```
-┌─────────────┐     ┌──────────────┐     ┌────────────────┐
-│ Pipeline    │     │              │     │ Web UI         │
-│ Handlers    │────►│  Redis       │────►│ Visualization  │
-│             │     │  Pub/Sub     │     │                │
-└─────────────┘     └──────────────┘     └────────────────┘
+┌────────────────┐     ┌──────────────┐     ┌────────────────┐     ┌─────────┐
+│                │     │              │     │                │     │         │
+│ Pipeline       │────►│  Redis       │────►│ WebSocket      │────►│ Browser │
+│ Process        │     │  Server      │     │ Connection     │     │ Client  │
+│                │     │              │     │                │     │         │
+└────────────────┘     └──────────────┘     └────────────────┘     └─────────┘
 ```
 
-Benefits:
-- Real-time visualization of pipeline internals
-- Non-intrusive monitoring
-- Performance tuning insights
-- Enhanced debugging capabilities
+### Implementation Details
+
+1. **WebSocket Endpoints**
+   - `/ws/pipeline` - Pipeline status updates
+   - `/ws/queue` - Queue data streaming (frames, detections)
+   - Request parameters identify target pipeline and queue
+
+2. **Connection Manager**
+   - Central class for managing WebSocket connections
+   - Handles connection lifecycles (connect, disconnect)
+   - Maps connections to pipeline/queue subscriptions
+   - Provides broadcasting methods for messages
+
+3. **Redis Bridge**
+   - Asynchronous Redis subscription to pipeline channels
+   - Automatic reconnection on Redis connection issues
+   - Efficient message routing to interested WebSocket clients
+   - Background tasks for monitoring and cleanup
+
+4. **Message Protocol**
+   - Type-based message format (connection_status, frame, detection, etc.)
+   - Timestamps for chronological ordering
+   - Metadata for context (pipeline name, queue name)
+   - Binary encoding options for efficient frame transport
+
+### Benefits
+
+The WebSocket integration provides essential capabilities:
+
+1. **Real-time Updates**
+   - Immediate pipeline status updates to all connected clients
+   - Live visualization of camera frames and detection results
+   - No polling required for state changes
+
+2. **Efficient Communication**
+   - Multiple clients can subscribe to the same data streams
+   - WebSocket connection reuse for multiple subscriptions
+   - Minimal overhead compared to HTTP polling
+
+3. **Robust Connection Management**
+   - Automatic cleanup of disconnected clients
+   - Graceful handling of network issues
+   - Background monitoring of pipeline availability
+
+4. **Scalable Architecture**
+   - Redis as the central message bus enables scaling
+   - WebSockets can be distributed across multiple servers
+   - New visualization clients can be added without pipeline changes
+
+## Frontend Architecture
+
+The web frontend provides a modern interface for monitoring and controlling the system:
+
+```
+┌───────────────────────────────────────────────────────────────┐
+│ Frontend (Next.js)                                            │
+│                                                               │
+│  ┌─────────────────────┐          ┌───────────────────────┐   │
+│  │ REST API Client     │          │ WebSocket Connections │   │
+│  └─────────────────────┘          └───────────────────────┘   │
+│             │                                 │               │
+│             ▼                                 ▼               │
+│  ┌─────────────────────┐          ┌───────────────────────┐   │
+│  │ React Query Hooks   │          │ Streaming Data Hooks  │   │
+│  └─────────────────────┘          └───────────────────────┘   │
+│             │                                 │               │
+│             └─────────────────┬───────────────┘               │
+│                               │                               │
+│                               ▼                               │
+│  ┌───────────────────────────────────────────────────────┐    │
+│  │ Dashboard UI                                          │    │
+│  │                                                       │    │
+│  │  ┌─────────────────┐         ┌─────────────────────┐  │    │
+│  │  │ Control Panel   │         │ Visualization Area  │  │    │
+│  │  └─────────────────┘         └─────────────────────┘  │    │
+│  │                                                       │    │
+│  └───────────────────────────────────────────────────────┘    │
+│                                                               │
+└───────────────────────────────────────────────────────────────┘
+```
+
+Key components:
+- REST API Client for pipeline control operations
+- WebSocket connections for real-time data
+- React Query for data fetching and caching
+- Custom hooks for WebSocket data streaming
+- Responsive UI with adjustable panels
+- Pipeline control and visualization areas
 
 ## Conclusion
 
@@ -513,6 +713,7 @@ The Modulus Robot Arm Control system embodies key architectural principles:
 1. **Separation of Concerns**: Each component has a clear, focused responsibility
 2. **Fault Isolation**: Process-based architecture prevents cascading failures
 3. **Responsive Design**: Priority queues ensure critical operations aren't delayed
-4. **Configuration Over Code**: YAML-based configuration enables flexibility
-5. **Extensibility**: New pipelines can be added without modifying core code
-6. **Interchangeable Backends**: Support for both ImageZMQ (not recommended) and Redis backends
+4. **Configuration Over Code**: Multi-layered configuration enables flexibility
+5. **Extensibility**: Factory patterns allow adding new implementations without modifying core code
+6. **Real-time Communication**: WebSocket integration provides immediate updates to clients
+7. **Pluggable Components**: Handler factories enable specialized processing modules

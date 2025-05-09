@@ -20,12 +20,15 @@ The frontend is a modern Next.js application that provides a dashboard for monit
 - **TypeScript**: Type-safe JavaScript
 - **Tailwind CSS**: Utility-first CSS framework
 - **Shadcn/UI**: High-quality UI components
+- **React Query**: Data fetching and state management
+- **Jotai**: Lightweight state management
 
 ## Directory Structure
 
 - [frontend/src/app/](mdc:frontend/src/app) - Next.js application pages
   - Page-based routing with React Server Components
-  - API routes for client-side communication
+  - Dashboard component with pipeline controls
+  - Visualization card for real-time frame display
 
 - [frontend/src/components/](mdc:frontend/src/components) - Reusable UI components
   - UI building blocks for the dashboard
@@ -36,16 +39,24 @@ The frontend is a modern Next.js application that provides a dashboard for monit
   - WebSocket integration for real-time updates
   - Data formatting and transformation
 
+- [frontend/src/hooks/](mdc:frontend/src/hooks) - Custom React hooks
+  - API data hooks using React Query
+  - WebSocket connection hooks for real-time data
+  - State management hooks using Jotai
+
 ## Key Features
 
 - Pipeline management (list, start, stop)
-- Configuration editing
 - Signal control with different priority levels
-- Real-time frame visualization
-- Status monitoring of active pipelines
+- Real-time pipeline status monitoring via WebSockets
+- Live frame visualization from pipeline queues
+- Responsive design with different layouts for mobile and desktop
 
 ## Communication with Backend
 
 - REST API calls for basic operations (list pipelines, start/stop)
-- WebSocket connection for real-time updates
-- Image streaming for visualization of camera feed and detection results
+- WebSocket connections for real-time updates:
+  - Pipeline WebSocket: `ws://host:port/ws/pipeline?pipeline_name=<name>`
+  - Queue WebSocket: `ws://host:port/ws/queue?pipeline_name=<name>&queue_name=<queue>`
+- React Query for efficient data fetching and caching
+- Custom hooks for WebSocket data streaming
