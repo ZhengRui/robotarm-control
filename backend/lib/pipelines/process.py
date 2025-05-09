@@ -37,7 +37,6 @@ class PipelineProcess:
         pipeline_class: Type[BasePipeline],
         pipeline_name: str,
         config_override: Optional[Dict[str, Any]] = None,
-        debug: bool = False,
     ):
         """Initialize a pipeline process manager.
 
@@ -45,12 +44,10 @@ class PipelineProcess:
             pipeline_class: The BasePipeline subclass to instantiate
             pipeline_name: Name of the pipeline
             config_override: Optional configuration overrides
-            debug: Whether to enable debug mode
         """
         self.pipeline_class = pipeline_class
         self.pipeline_name = pipeline_name
         self.config_override = config_override or {}
-        self.debug = debug
 
         # IPC queues
         self.signal_queue: multiprocessing.Queue = multiprocessing.Queue()
@@ -67,7 +64,7 @@ class PipelineProcess:
             logger.warning(f"Pipeline '{self.pipeline_name}' already running")
             return
 
-        logger.info(f"Starting pipeline '{self.pipeline_name}' in separate process (debug={self.debug})")
+        logger.info(f"Starting pipeline '{self.pipeline_name}' in separate process")
 
         # Create and start the process
         self.process = multiprocessing.Process(
@@ -76,7 +73,6 @@ class PipelineProcess:
                 self.pipeline_class,
                 self.pipeline_name,
                 self.config_override,
-                self.debug,
                 self.signal_queue,
                 self.status_queue,
             ),
@@ -176,7 +172,6 @@ class PipelineProcess:
         pipeline_class: Type[BasePipeline],
         pipeline_name: str,
         config_override: Dict[str, Any],
-        debug: bool,
         signal_queue: multiprocessing.Queue,
         status_queue: multiprocessing.Queue,
     ):
@@ -188,7 +183,6 @@ class PipelineProcess:
             pipeline_class: The BasePipeline subclass to instantiate
             pipeline_name: Name of the pipeline
             config_override: Configuration overrides
-            debug: Debug flag
             signal_queue: Queue for receiving signals
             status_queue: Queue for sending status updates
         """
@@ -201,7 +195,7 @@ class PipelineProcess:
 
         try:
             # Create pipeline instance with pipeline_name
-            pipeline = pipeline_class(pipeline_name=pipeline_name, config_override=config_override, debug=debug)
+            pipeline = pipeline_class(pipeline_name=pipeline_name, config_override=config_override)
 
             # Initial status update
             _send_status(pipeline, status_queue, stop_event)

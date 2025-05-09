@@ -32,7 +32,6 @@ app.include_router(websocket_router)
 
 # Get initial pipeline settings from environment variables
 initial_pipeline = os.environ.get("PIPELINE")
-initial_debug = os.environ.get("DEBUG", "").lower() == "true"
 
 
 class SignalRequest(BaseModel):
@@ -45,16 +44,15 @@ class SignalRequest(BaseModel):
 @app.get("/pipelines")
 async def get_pipelines(with_meta: bool = False):
     """Get information about all available pipelines."""
-    # Get all registered pipelines from config
-    available_pipeline_names = PipelineFactory.get_available_pipelines()
 
     # Format response based on requested detail level
     pipelines = []
 
-    for pipeline_name in available_pipeline_names:
+    for pipeline_name, pipeline_config in config.items():
         pipeline_status = PipelineFactory.get_status(pipeline_name)
         if with_meta and isinstance(pipeline_status, dict):
-            meta = PipelineFactory.get_meta(pipeline_name)
+            pipeline_type = pipeline_config.get("pipeline", pipeline_name)
+            meta = PipelineFactory.get_meta(pipeline_type)
             pipeline_status.update(meta)
 
         pipelines.append(pipeline_status)
@@ -69,10 +67,16 @@ async def get_pipeline(pipeline_name: str, with_meta: bool = False):
     Args:
         pipeline_name: Name of the pipeline
     """
+
+    # Check if pipeline exists in config
+    if pipeline_name not in config:
+        raise HTTPException(status_code=404, detail=f"Pipeline configuration '{pipeline_name}' not found")
+
     try:
         pipeline_status = PipelineFactory.get_status(pipeline_name)
         if with_meta and isinstance(pipeline_status, dict):
-            meta = PipelineFactory.get_meta(pipeline_name)
+            pipeline_type = config[pipeline_name].get("pipeline", pipeline_name)
+            meta = PipelineFactory.get_meta(pipeline_type)
             pipeline_status.update(meta)
 
         return pipeline_status
@@ -85,17 +89,19 @@ async def get_pipeline(pipeline_name: str, with_meta: bool = False):
 
 
 @app.post("/pipeline/start")
-async def start_pipeline(pipeline_name: str, debug: bool = False):
+async def start_pipeline(pipeline_name: str):
     """Start a specific pipeline.
 
     Args:
         pipeline_name: Name of the pipeline to start
-        debug: Debug flag
     """
+
+    # Check if pipeline exists in config
+    if pipeline_name not in config:
+        raise HTTPException(status_code=404, detail=f"Pipeline configuration '{pipeline_name}' not found")
+
     try:
-        success = PipelineFactory.create_pipeline(
-            pipeline_name, config_override=config.get(pipeline_name, {}), debug=debug
-        )
+        success = PipelineFactory.create_pipeline(pipeline_name, config_override=config.get(pipeline_name, {}))
 
         if not success:
             raise HTTPException(status_code=500, detail=f"Failed to start pipeline '{pipeline_name}'")
@@ -203,9 +209,9 @@ async def startup_event():
     # Start initial pipeline if specified in environment variables
     if initial_pipeline:
         try:
-            logger.info(f"Starting initial pipeline '{initial_pipeline}' (debug={initial_debug})")
+            logger.info(f"Starting initial pipeline '{initial_pipeline}'")
             success = PipelineFactory.create_pipeline(
-                initial_pipeline, config_override=config.get(initial_pipeline, {}), debug=initial_debug
+                initial_pipeline, config_override=config.get(initial_pipeline, {})
             )
             if not success:
                 logger.error(f"Failed to start initial pipeline '{initial_pipeline}'")

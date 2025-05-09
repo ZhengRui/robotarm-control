@@ -38,14 +38,14 @@ class PipelineFactory:
     _manager: Optional[PipelineManager] = None
 
     @classmethod
-    def register_pipeline(cls, name: str, pipeline_class: Type[BasePipeline]) -> None:
-        """Register a pipeline class with a name.
+    def register_pipeline(cls, pipeline_type: str, pipeline_class: Type[BasePipeline]) -> None:
+        """Register a pipeline class with a type string.
 
         Args:
-            name: Name to register the pipeline class under
+            pipeline_type: Type string to register the pipeline class under
             pipeline_class: The pipeline class to register
         """
-        cls._pipeline_registry[name] = {
+        cls._pipeline_registry[pipeline_type] = {
             "class_": pipeline_class,
             "meta": {
                 "available_states": pipeline_class.get_available_states(),
@@ -54,7 +54,7 @@ class PipelineFactory:
                 "config_schema": pipeline_class.get_config_schema(),
             },
         }
-        logger.debug(f"Registered pipeline class: {name}")
+        logger.debug(f"Registered pipeline class: {pipeline_type}")
 
     @classmethod
     def get_pipeline_manager(cls) -> PipelineManager:
@@ -69,11 +69,11 @@ class PipelineFactory:
         return cls._manager
 
     @classmethod
-    def get_available_pipelines(cls) -> List[str]:
-        """Get list of available (registered) pipelines.
+    def get_available_pipeline_types(cls) -> List[str]:
+        """Get list of available (registered) pipeline types.
 
         Returns:
-            List of pipeline names that are registered
+            List of pipeline types that are registered
         """
         return list(cls._pipeline_registry.keys())
 
@@ -88,9 +88,7 @@ class PipelineFactory:
         return manager.get_running_pipelines()
 
     @classmethod
-    def create_pipeline(
-        cls, pipeline_name: str, config_override: Optional[Dict[str, Any]] = None, debug: bool = False
-    ) -> bool:
+    def create_pipeline(cls, pipeline_name: str, config_override: Optional[Dict[str, Any]] = None) -> bool:
         """Create a pipeline instance based on name.
 
         This method looks up the pipeline class in the registry and creates
@@ -99,7 +97,6 @@ class PipelineFactory:
         Args:
             pipeline_name: Name of the pipeline to create
             config_override: Optional configuration dictionary to override defaults
-            debug: Whether to enable debug mode
 
         Returns:
             True if pipeline created successfully, False otherwise
@@ -107,19 +104,21 @@ class PipelineFactory:
         Raises:
             ValueError: If pipeline_name is not registered
         """
+        pipeline_type = config_override.get("pipeline", pipeline_name) if config_override else pipeline_name
+
         # Check if pipeline is registered
-        if pipeline_name not in cls._pipeline_registry:
-            error_msg = f"Unknown pipeline: {pipeline_name}"
+        if pipeline_type not in cls._pipeline_registry:
+            error_msg = f"Unregistered pipeline type '{pipeline_type}' for pipeline '{pipeline_name}'"
             logger.error(error_msg)
             raise ValueError(error_msg)
 
         # Get the pipeline class
-        pipeline_class = cls._pipeline_registry[pipeline_name]["class_"]
+        pipeline_class = cls._pipeline_registry[pipeline_type]["class_"]
 
         # Create the pipeline through the manager
         manager = cls.get_pipeline_manager()
         return manager.create_pipeline(
-            pipeline_class=pipeline_class, pipeline_name=pipeline_name, config_override=config_override, debug=debug
+            pipeline_class=pipeline_class, pipeline_name=pipeline_name, config_override=config_override
         )
 
     @classmethod
@@ -161,30 +160,30 @@ class PipelineFactory:
             Dictionary with status information for a specific pipeline,
             or list of dictionaries for all pipelines
         """
-        if pipeline_name is not None and pipeline_name not in cls._pipeline_registry:
-            error_msg = f"Unknown pipeline: {pipeline_name}"
-            logger.error(error_msg)
-            raise ValueError(error_msg)
-
         manager = cls.get_pipeline_manager()
         return manager.get_status(pipeline_name)
 
     @classmethod
-    def get_meta(cls, pipeline_name: str) -> PipelineMeta:
+    def get_meta(cls, pipeline_type: str) -> PipelineMeta:
         """Get meta information for a pipeline.
 
         Args:
-            pipeline_name: Name of the pipeline
+            pipeline_type: Type of the pipeline
 
         Returns:
             Dictionary with meta information for a specific pipeline
         """
-        if pipeline_name not in cls._pipeline_registry:
-            error_msg = f"Unknown pipeline: {pipeline_name}"
-            logger.error(error_msg)
-            raise ValueError(error_msg)
+        empty_meta: PipelineMeta = {
+            "available_states": [],
+            "available_signals": [],
+            "available_queues": [],
+            "config_schema": {},
+        }
 
-        return cls._pipeline_registry[pipeline_name]["meta"]
+        if pipeline_type not in cls._pipeline_registry:
+            return empty_meta
+
+        return cls._pipeline_registry[pipeline_type]["meta"]
 
     @classmethod
     def cleanup(cls) -> None:

@@ -31,7 +31,6 @@ class PipelineManager:
         pipeline_class: Type[BasePipeline],
         pipeline_name: str,
         config_override: Optional[Dict[str, Any]] = None,
-        debug: bool = False,
     ) -> bool:
         """Create and start a new pipeline process.
 
@@ -39,7 +38,6 @@ class PipelineManager:
             pipeline_class: The BasePipeline subclass to instantiate
             pipeline_name: Name for the pipeline instance
             config_override: Optional configuration overrides
-            debug: Whether to enable debug mode
 
         Returns:
             True if pipeline created successfully, False otherwise
@@ -53,7 +51,7 @@ class PipelineManager:
             # Create and start new pipeline process
             logger.info(f"Creating pipeline '{pipeline_name}'")
             process = PipelineProcess(
-                pipeline_class=pipeline_class, pipeline_name=pipeline_name, config_override=config_override, debug=debug
+                pipeline_class=pipeline_class, pipeline_name=pipeline_name, config_override=config_override
             )
             process.start()
 

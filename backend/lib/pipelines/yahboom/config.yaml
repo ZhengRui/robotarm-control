@@ -1,0 +1,57 @@
+Pipeline:
+  redis:
+    host: "127.0.0.1"
+    port: 6379
+    db: 0
+    password: null
+
+  handlers:
+    data_loader:
+      init:
+        backend: "redis"
+      process:
+        queue: "camera_frames"
+        wait: true
+        timeout: 0.5
+
+    calibrate:
+      init:
+        binary_threshold: 140
+
+    detect:
+      init:
+        color_hsv_thresholds:
+          red: [[[0, 70, 50], [10, 255, 255]], [[170, 70, 50], [180, 255, 255]]]
+          green: [[[34, 43, 46], [77, 255, 255]]]
+          blue: [[[72, 205, 99], [122, 255, 229]]]
+          yellow: [[[21, 172, 185], [255, 255, 242]]]
+        coord_mapping_configs:
+          pixels_per_meter: [4200, 4000]
+          rotation_matrix: [[0, -1], [-1, 0]]
+          offset: [0.27, 0.0762]
+
+    arm_control:
+      init:
+        port: "/dev/ttyUSB0"
+        baudrate: 1000000
+        task: "pick_and_place"
+        grasp_offset: [-0.02, -0.005]
+        init_angles: [43, 0, 0, -80, -6, -6]
+        coord_config:
+          pre_grasp_z: 180
+          grasp_z: 130
+          post_grasp_z: 200
+          place:
+            red: [75, 230, 130, -175, 0, -45]
+            green: [10, 230, 130, -175, 0, -45]
+            blue: [-70, 230, 130, -175, 0, -45]
+            yellow: [140, 230, 130, -175, 0, -45]
+          stack:
+            first: [135, -155, 130, -175, 0, -45]
+            delta_z: 30
+        gripper_config:
+          open: 100
+          close: 20
+      process:
+        speed: 40
+        delay: 1

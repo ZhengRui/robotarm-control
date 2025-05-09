@@ -1,23 +1,15 @@
-from typing import Any, Dict, Optional, Tuple
+from typing import Dict, Optional, Tuple
 
 import cv2
 import numpy as np
 
-from ..utils.logger import get_logger
+from ....handlers import BaseHandler
+from ....utils.logger import get_logger
 
 logger = get_logger("calibrate")
 
 
-class CalibrateHandler:
-    def __init__(self, name: str = "yahboom", **kwargs: Any) -> None:
-        if name == "yahboom":
-            self.handler = YahboomCalibrateHandler()
-
-    def process(self, frame: np.ndarray, debug: bool = False, **kwargs: Any) -> Dict[str, Optional[np.ndarray]]:
-        return self.handler.process(frame, debug=debug, **kwargs)
-
-
-class YahboomCalibrateHandler:
+class CalibrateHandler(BaseHandler):
     def __init__(self, binary_threshold: int = 140) -> None:
         self.wnd_size: Optional[Tuple[int, int]] = None
         self.binary_threshold = binary_threshold

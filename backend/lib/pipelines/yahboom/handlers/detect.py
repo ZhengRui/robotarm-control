@@ -3,21 +3,13 @@ from typing import Any, Dict, Optional, Tuple, Union
 import cv2
 import numpy as np
 
-from ..utils.logger import get_logger
+from ....handlers import BaseHandler
+from ....utils.logger import get_logger
 
 logger = get_logger("detect")
 
 
-class DetectHandler:
-    def __init__(self, name: str = "yahboom", **kwargs: Any) -> None:
-        if name == "yahboom":
-            self.handler = YahboomDetectHandler(**kwargs)
-
-    def process(self, frame: np.ndarray, debug: bool = False, **kwargs: Any) -> Dict[str, Any]:
-        return self.handler.process(frame, debug=debug, **kwargs)
-
-
-class YahboomDetectHandler:
+class DetectHandler(BaseHandler):
     def __init__(
         self,
         color_hsv_thresholds: Dict[str, Tuple[Tuple[Tuple[int, int, int], Tuple[int, int, int]], ...]] = {
@@ -29,7 +21,7 @@ class YahboomDetectHandler:
         coord_mapping_configs: Dict[str, Any] = {
             "pixels_per_meter": [4200, 4000],
             "rotation_matrix": [[0, -1], [-1, 0]],
-            "offset": [480 / 4000 + 0.15, 320 / 4200],
+            "offset": [0.27, 0.0762],  # 480 / 4000 + 0.15, 320 / 4200
         },
     ) -> None:
         self.wnd_size: Optional[Tuple[int, int]] = None
@@ -92,7 +84,12 @@ class YahboomDetectHandler:
 
         return x, y
 
-    def process(self, frame: np.ndarray, do_coord_mapping: bool = True, debug: bool = False) -> Dict[str, Any]:
+    def process(
+        self,
+        frame: np.ndarray,
+        do_coord_mapping: bool = True,
+        debug: bool = False,
+    ) -> Dict[str, Any]:
         h, w = frame.shape[:2]
 
         if debug and (not self.wnd_size or self.wnd_size != (h, w)):

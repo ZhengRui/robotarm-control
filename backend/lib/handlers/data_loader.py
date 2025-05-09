@@ -1,13 +1,14 @@
 import base64
 import json
 import time
-from abc import ABC, abstractmethod
+from abc import abstractmethod
 from typing import Any, Optional, TypedDict, Union
 
 import numpy as np
 
 from ..utils.data_factory import decode
 from ..utils.logger import get_logger
+from .base import BaseHandler
 
 logger = get_logger("dataloader")
 
@@ -19,7 +20,7 @@ class FrameResult(TypedDict, total=False):
     error: str
 
 
-class BaseDataLoaderHandler(ABC):
+class BaseDataLoaderHandler(BaseHandler):
     """Abstract base class for data loader handlers.
 
     Defines the interface that all data loader handlers must implement.
@@ -254,7 +255,7 @@ class RedisDataLoaderHandler(BaseDataLoaderHandler):
             self.redis = None  # type: ignore
 
 
-class DataLoaderHandler:
+class DataLoaderHandler(BaseDataLoaderHandler):
     """Handler for loading image data from various sources.
 
     This handler provides a unified interface for receiving frames from
@@ -265,27 +266,27 @@ class DataLoaderHandler:
     for subsequent handlers to process.
     """
 
-    def __init__(self, name: str = "imagezmq", **kwargs: Any) -> None:
+    def __init__(self, backend: str = "imagezmq", **kwargs: Any) -> None:
         """Initialize the data loader handler.
 
         Creates a connection to the specified backend for receiving frames.
 
         Args:
-            name: Backend to use ('imagezmq' or 'redis')
+            backend: Backend to use ('imagezmq' or 'redis')
             **kwargs: Additional configuration parameters for the backend
         """
-        self.name = name.lower()
+        self.backend = backend.lower()
 
         # Initialize appropriate handler based on backend
         self.handler: Union[ImageZMQDataLoaderHandler, RedisDataLoaderHandler]
-        if self.name == "imagezmq":
+        if self.backend == "imagezmq":
             self.handler = ImageZMQDataLoaderHandler(**kwargs)
             logger.info("DataLoaderHandler initialized with ImageZMQ backend")
-        elif self.name == "redis":
+        elif self.backend == "redis":
             self.handler = RedisDataLoaderHandler(**kwargs)
             logger.info("DataLoaderHandler initialized with Redis backend")
         else:
-            raise ValueError(f"Unsupported backend: {name}. Use 'imagezmq' or 'redis'.")
+            raise ValueError(f"Unsupported backend: {backend}. Use 'imagezmq' or 'redis'.")
 
     def process(self, **kwargs: Any) -> FrameResult:
         """Process a single data loading step.

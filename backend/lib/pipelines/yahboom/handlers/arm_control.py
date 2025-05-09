@@ -4,21 +4,13 @@ from typing import Any, Dict, List, Optional, Tuple
 from pymycobot import MyCobot280, MyCobot280Socket
 from pymycobot.genre import Coord
 
-from ..utils.logger import get_logger
+from ....handlers import BaseHandler
+from ....utils.logger import get_logger
 
 logger = get_logger("armcontrol")
 
 
-class ArmControlHandler:
-    def __init__(self, name: str = "yahboom", **kwargs: Any) -> None:
-        if name == "yahboom":
-            self.handler = YahboomArmControlHandler(**kwargs)
-
-    def process(self, objects: List[Dict[str, Any]], debug: bool = False, **kwargs: Any) -> Dict[str, Any]:
-        return self.handler.process(objects, debug=debug, **kwargs)
-
-
-class YahboomArmControlHandler:
+class ArmControlHandler(BaseHandler):
     def __init__(
         self,
         remote_addr: Optional[str] = None,

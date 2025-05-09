@@ -6,8 +6,8 @@ from typing import Any, Dict, List, Optional
 import cv2
 import numpy as np
 
-from ..utils.logger import get_logger
-from .base import BasePipeline
+from ...utils.logger import get_logger
+from ..base import BasePipeline
 
 # Create module-level logger
 logger = get_logger("yahboom_pipeline")
@@ -42,7 +42,7 @@ class PipelineQueue(Enum):
     DETECTION_FRAMES = "detection_frames"
 
 
-class YahboomPickAndPlacePipeline(BasePipeline):
+class Pipeline(BasePipeline):
     """Pipeline for pick and place operations with the Yahboom robot arm.
 
     This pipeline follows these states:
@@ -52,6 +52,7 @@ class YahboomPickAndPlacePipeline(BasePipeline):
 
     User signals:
     - "reset_arm": Reset the robot arm
+    - "re_calibrate": Re-calibrate the robot arm
     - "calibration_confirmed": Transition from CALIBRATING to DETECTING
     - "pick_place": Transition from DETECTING to PICKING_PLACING
     - "stop": Stop the pipeline
@@ -61,14 +62,12 @@ class YahboomPickAndPlacePipeline(BasePipeline):
         self,
         pipeline_name: str = "yahboom_pick_and_place",
         config_override: Optional[Dict[str, Any]] = None,
-        debug: bool = False,
     ):
         """Initialize the yahboom pick and place pipeline.
 
         Args:
-            pipeline_name: Name of the pipeline (used to load configuration)
+            pipeline_name: Name of the pipeline
             config_override: Optional configuration overrides
-            debug: Whether to enable debug mode for visualization
         """
         # Initialize state before parent constructor to ensure it's set before the thread starts
         self.state = PipelineState.IDLE
@@ -86,12 +85,13 @@ class YahboomPickAndPlacePipeline(BasePipeline):
         self.pt_matrix: Optional[np.ndarray] = None
 
         # Call parent constructor - this will start the pipeline thread
-        super().__init__(pipeline_name=pipeline_name, config_override=config_override, debug=debug)
+        super().__init__(pipeline_name=pipeline_name, config_override=config_override)
 
-        self.dataloader_handler = self.handlers.get("dataloader", None)
+        self.dataloader_handler = self.handlers.get("data_loader", None)
         self.calibrate_handler = self.handlers.get("calibrate", None)
         self.detect_handler = self.handlers.get("detect", None)
-        self.arm_control_handler = self.handlers.get("armcontrol", None)
+        self.arm_control_handler = self.handlers.get("arm_control", None)
+        self.config_handlers = self.config.get("handlers", {})
 
     @classmethod
     def get_available_signals(cls) -> List[str]:
@@ -155,11 +155,11 @@ class YahboomPickAndPlacePipeline(BasePipeline):
 
         if signal == PipelineSignal.RESET_ARM.value:
             logger.info("Resetting arm")
-            self.arm_control_handler.handler._reset()
+            self.arm_control_handler._reset()
 
         if signal == PipelineSignal.RE_CALIBRATE.value:
             logger.info("Re-calibrating")
-            self.arm_control_handler.handler._reset()
+            self.arm_control_handler._reset()
             self.state = PipelineState.CALIBRATING
 
         if signal == PipelineSignal.CALIBRATION_CONFIRMED.value and self.state == PipelineState.CALIBRATING:
@@ -183,7 +183,7 @@ class YahboomPickAndPlacePipeline(BasePipeline):
         # Skip processing if in IDLE or STOPPED state
         if self.state == PipelineState.IDLE:
             # Initialize the robot arm
-            self.arm_control_handler.handler._reset()
+            self.arm_control_handler._reset()
 
             # Initialize to calibration state on first step
             self.state = PipelineState.CALIBRATING
@@ -224,7 +224,7 @@ class YahboomPickAndPlacePipeline(BasePipeline):
 
         try:
             # Get process parameters for dataloader
-            process_params = self.config.get("dataloader", {}).get("process", {})
+            process_params = self.config_handlers.get("data_loader", {}).get("process", {})
 
             # Process frame with dataloader handler
             result = self.dataloader_handler.process(**process_params)
@@ -262,10 +262,10 @@ class YahboomPickAndPlacePipeline(BasePipeline):
 
         try:
             # Get process parameters for calibration
-            process_params = self.config.get("calibrate", {}).get("process", {})
+            process_params = self.config_handlers.get("calibrate", {}).get("process", {})
 
             # Process frame with calibration handler
-            result = self.calibrate_handler.process(self.current_frame, debug=self.debug, **process_params)
+            result = self.calibrate_handler.process(self.current_frame, **process_params)
 
             # Store the perspective transformation matrix
             if result and "pt_matrix" in result:
@@ -288,13 +288,13 @@ class YahboomPickAndPlacePipeline(BasePipeline):
 
         try:
             # Get process parameters for detection
-            process_params = self.config.get("detect", {}).get("process", {})
+            process_params = self.config_handlers.get("detect", {}).get("process", {})
 
             # Use the perspective transformed frame if available
             frame_to_process = self.current_pt_frame if self.current_pt_frame is not None else self.current_frame
 
             # Process frame with detection handler - returns a list of detections directly
-            result = self.detect_handler.process(frame_to_process, debug=self.debug, **process_params)
+            result = self.detect_handler.process(frame_to_process, **process_params)
 
             if result and "detections" in result:
                 self.detected_objects = result["detections"]
@@ -324,10 +324,10 @@ class YahboomPickAndPlacePipeline(BasePipeline):
 
         try:
             # Get process parameters for arm control
-            process_params = self.config.get("armcontrol", {}).get("process", {})
+            process_params = self.config_handlers.get("arm_control", {}).get("process", {})
 
             # Process objects with arm control handler
-            result = self.arm_control_handler.process(self.detected_objects, debug=self.debug, **process_params)
+            result = self.arm_control_handler.process(self.detected_objects, **process_params)
             failed = result.get("failed", [])
 
             if failed:

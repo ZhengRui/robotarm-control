@@ -1,28 +1,31 @@
 # Example production configuration
 # Rename to prod.yaml to use
 yahboom_pick_and_place:
+  pipeline: "yahboom_pick_and_place"
+
   redis:
     host: "redis-server"  # Production Redis server
     port: 6379
     db: 0
     password: "your-strong-password"  # Use strong password in production
 
-  dataloader:
-    process:
-      queue: "camera_frames"
-      wait: true
-      timeout: 0.5
+  handlers:
+    data_loader:
+      process:
+        queue: "camera_frames"
+        wait: true
+        timeout: 0.5
 
-  calibrate:
-    init:
-      binary_threshold: 140  # Optimized for production lighting
+    calibrate:
+      init:
+        binary_threshold: 140  # Optimized for production lighting
 
-  detect:
-    init:
-      color_hsv_thresholds:
-        red: [[0, 43, 46], [10, 255, 255]]
-        green: [[35, 43, 46], [77, 255, 255]]
-        blue: [[100, 43, 46], [124, 255, 255]]
-        yellow: [[26, 43, 46], [34, 255, 255]]
+    detect:
+      init:
+        color_hsv_thresholds:
+          red: [[0, 43, 46], [10, 255, 255]]
+          green: [[35, 43, 46], [77, 255, 255]]
+          blue: [[100, 43, 46], [124, 255, 255]]
+          yellow: [[26, 43, 46], [34, 255, 255]]
 
-  # armcontrol configs ...
+    # arm_control configs ...

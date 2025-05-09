@@ -27,10 +27,10 @@ async def pipeline_websocket(
     """
     # Check if pipeline exists in configuration
     try:
-        # Use PipelineFactory to check if pipeline exists
-        available_pipelines = PipelineFactory.get_available_pipelines()
-        if pipeline_name not in available_pipelines:
-            await websocket.close(code=4004, reason=f"Pipeline '{pipeline_name}' not found")
+        # Use PipelineFactory to check if pipeline is running
+        running_pipelines = PipelineFactory.get_running_pipelines()
+        if pipeline_name not in running_pipelines:
+            await websocket.close(code=4004, reason=f"Pipeline '{pipeline_name}' not running")
             return
 
         # Connect to pipeline status feed
@@ -77,10 +77,10 @@ async def queue_websocket(
     """
     # Check if pipeline exists in configuration
     try:
-        # Use PipelineFactory to check if pipeline exists
-        available_pipelines = PipelineFactory.get_available_pipelines()
-        if pipeline_name not in available_pipelines:
-            await websocket.close(code=4004, reason=f"Pipeline '{pipeline_name}' not found")
+        # Use PipelineFactory to check if pipeline is running
+        running_pipelines = PipelineFactory.get_running_pipelines()
+        if pipeline_name not in running_pipelines:
+            await websocket.close(code=4004, reason=f"Pipeline '{pipeline_name}' not running")
             return
 
         # Connect to queue data feed

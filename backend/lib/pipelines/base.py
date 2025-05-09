@@ -1,5 +1,6 @@
 import json
 import os
+import sys
 import time
 from abc import ABC, abstractmethod
 from typing import Any, Dict, List, Optional
@@ -30,33 +31,32 @@ class BasePipeline(ABC):
     - step(): Process a single step in the current pipeline state
     """
 
-    def __init__(self, pipeline_name: str, config_override: Optional[Dict[str, Any]] = None, debug: bool = False):
+    def __init__(self, pipeline_name: str, config_override: Optional[Dict[str, Any]] = None):
         """Initialize pipeline with configuration.
 
         Args:
             pipeline_name: Name of the pipeline (used to load configuration)
             config_override: Optional configuration dictionary to override defaults
-            debug: Whether to enable debug mode for visualization and logging
 
         Raises:
             RuntimeError: If pipeline fails to initialize
         """
         self.pipeline_name = pipeline_name
-        self.debug = debug
 
-        logger.info(f"Initializing pipeline: {pipeline_name} (debug={debug})")
+        logger.info(f"Initializing pipeline: {pipeline_name}")
 
         # Load default configuration
         self.config = self._load_config()
 
-        # Extract this pipeline's configuration
-        self.config = self.config.get(self.pipeline_name, {})
         if not self.config:
             logger.warning(f"No configuration found for pipeline: {pipeline_name}")
 
         # Merge with override config if provided
         if config_override:
             self._merge_config(config_override)
+
+        # pretty log config
+        logger.info(f"Final configuration for pipeline '{self.pipeline_name}':\n{json.dumps(self.config, indent=2)}")
 
         # Initialize Redis client for queue publishing
         self.redis = self._initialize_redis_client()
@@ -119,21 +119,50 @@ class BasePipeline(ABC):
         return {}  # Base implementation returns empty dict
 
     def _load_config(self) -> Dict[str, Any]:
-        """Load configuration from default.yaml.
+        """Load configuration from pipeline-specific config.yaml.
+
+        Looks for the config.yaml file in the same directory as the pipeline class module.
+        The configuration is expected to be organized by pipeline class name.
 
         Returns:
-            Dictionary with all pipeline configurations
+            Dictionary with pipeline configuration
 
         Raises:
             RuntimeError: If configuration file cannot be loaded
         """
-        config_path = os.path.join(os.path.dirname(__file__), "default.yaml")
+        # Get the module path of the concrete pipeline class
+        module_path = self.__class__.__module__
+        module = sys.modules[module_path]
+
+        # Find the directory containing the module
+        if not hasattr(module, "__file__") or module.__file__ is None:
+            error_msg = f"Cannot determine module file path for pipeline '{self.pipeline_name}'"
+            logger.error(error_msg)
+            raise RuntimeError(error_msg)
+
+        module_dir = os.path.dirname(os.path.abspath(module.__file__))
+
+        # Path to the config.yaml file in the pipeline's directory
+        config_path = os.path.join(module_dir, "config.yaml")
 
         try:
             with open(config_path, "r") as f:
-                return yaml.safe_load(f) or {}
+                config = yaml.safe_load(f) or {}
+
+            # Get class name as the configuration key
+            class_name = self.__class__.__name__
+
+            # Extract the configuration for this specific pipeline class
+            if class_name in config:
+                return config[class_name]
+
+            # If there's no class-specific section, assume the entire config is for this pipeline
+            return config
         except (yaml.YAMLError, IOError) as e:
-            error_msg = f"Failed to load configuration from {config_path}: {e}"
+            error_msg = (
+                f"Failed to load configuration for pipeline '{self.pipeline_name}' "
+                f"(class {self.__class__.__name__}): {e}"
+            )
             logger.error(error_msg)
             raise RuntimeError(error_msg)
 
@@ -167,27 +196,24 @@ class BasePipeline(ABC):
         handlers = {}
 
         # Initialize handlers based on config keys
-        for handler_type, handler_config in self.config.items():
-            # Skip non-handler configuration sections
-            if not isinstance(handler_config, dict) or handler_type == "redis":
-                continue
-
+        for handler_type, handler_config in self.config.get("handlers", {}).items():
             try:
                 # Extract initialization parameters from the 'init' section if it exists
                 init_params = handler_config.get("init", {}).copy()
 
-                if handler_type == "dataloader":
+                if handler_type == "data_loader":
                     redis_config = self.config.get("redis", {})
                     if redis_config:
                         init_params.update(redis_config)
 
                 # Create the handler with initialization parameters
-                handlers[handler_type] = HandlerFactory.create_handler(handler_type=handler_type, config=init_params)
-            except ValueError:
-                # Skip keys that don't correspond to handler types
-                continue
+                handlers[handler_type] = HandlerFactory.create_handler(
+                    pipeline_class=self.__class__,
+                    handler_type=handler_type,
+                    config=init_params,
+                )
             except Exception as e:
-                error_msg = f"Failed to initialize {handler_type} handler for pipeline '{self.pipeline_name}': {e}"
+                error_msg = f"Failed to initialize '{handler_type}' handler for pipeline '{self.pipeline_name}': {e}"
                 logger.error(error_msg)
                 raise RuntimeError(error_msg)
 
