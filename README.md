@@ -127,23 +127,6 @@ You can specify the environment and initial pipeline:
 ENV=dev PIPELINE=yahboom_pick_and_place python main.py
 ```
 
-### Running the Streaming Client
-
-To stream video to the system:
-
-```bash
-python -m examples.streaming --source webcam:0 --keep_size --lossless --enable_freeze --visualization --max-frames 100 --time-window 0.1
-```
-
-Options:
-- `--source`: Video file, webcam (webcam:0), or directory of images
-- `--keep_size`: Maintain original image dimensions
-- `--lossless`: Use lossless encoding for frames
-- `--enable_freeze`: Allow pausing the stream with spacebar
-- `--visualization`: Show video feed with visualization
-- `--max-frames`: Set max number of frames for Redis memory management
-- `--time-window`: Set time window in seconds for Redis memory management
-
 ### API Endpoints
 
 The system exposes the following API endpoints:
@@ -231,6 +214,44 @@ bun run start
 - Real-time frame visualization from pipeline queues
 - Responsive layout for different devices
 
+## Running the Streaming Client
+
+The backend system is designed to process image frames, but it needs a source of data to operate. Once the backend server is running, it waits for streaming data inputs before the pipelines can process anything meaningful.
+
+To stream data to the system:
+
+```bash
+python -m examples.streaming --source webcam:0 --keep_size --lossless --enable_freeze --visualization --max-frames 100 --time-window 0.1
+```
+
+Options:
+- `--source`: Video file, webcam (webcam:0), or directory of images
+- `--keep_size`: Maintain original image dimensions
+- `--lossless`: Use lossless encoding for frames
+- `--enable_freeze`: Allow pausing the stream with spacebar
+- `--visualization`: Show video feed with visualization
+- `--max-frames`: Set max number of frames for Redis memory management
+- `--time-window`: Set latest time window in seconds for Redis memory management
+
+### Complete Data Flow
+
+When running a complete system:
+
+1. **The streaming client** captures frames from a camera or video file and sends them to Redis
+2. **The backend pipeline** receives these frames through its DataLoaderHandler
+3. **Pipeline handlers** process the frames (detection, control calculations, etc.)
+4. **The frontend dashboard** connects to the backend through:
+   - REST API for pipeline operations (start/stop)
+   - WebSockets for real-time updates and frame data
+
+With this setup, you can:
+- Start a pipeline from the dashboard
+- Send control signals to change pipeline behavior
+- Visualize the streaming frames and processing results in real-time
+- See the robot arm respond to the detected objects
+
+The frontend connects to the published queues of each pipeline, allowing you to monitor what the pipeline "sees" and how it's processing the data.
+
 ## Git Hooks Setup
 
 This project uses git hooks to ensure code quality and consistent commit messages.
@@ -256,11 +277,349 @@ This two-step process ensures that both frontend and backend hooks are properly 
 - **pre-commit**: Runs linting and formatting checks for both frontend and backend code
 - **commit-msg**: Validates commit messages according to conventional commit format
 
+## Implementing a Custom Pipeline
+
+The Modulus Robot Arm Control system is designed to be extensible through custom pipelines. Here's how to implement your own:
+
+### 1. Create a New Pipeline Module
+
+Create a new directory for your pipeline under `backend/lib/pipelines/`:
+
+```
+backend/lib/pipelines/my_custom_pipeline/
+├── __init__.py
+├── config.yaml
+├── handlers/
+│   ├── __init__.py
+│   └── custom_handler.py
+└── pipeline.py
+```
+
+### 2. Implement Your Pipeline Class
+
+Create a `pipeline.py` file that implements the pipeline state machine:
+
+<details>
+<summary>click to expand code: pipeline.py</summary>
+
+```python
+from typing import Dict, List, Optional, Any, Set
+import json
+from enum import Enum, auto
+from pydantic import BaseModel
+
+from ...utils.logger import get_logger
+from ..base import BasePipeline
+
+logger = get_logger("my_custom_pipeline")
+
+class PipelineState(str, Enum):
+    """Pipeline state enumeration."""
+    IDLE = "IDLE"
+    INIT = "INIT"
+    RUNNING = "RUNNING"
+    COMPLETE = "COMPLETE"
+
+class PipelineSignal(str, Enum):
+    """Pipeline signal enumeration."""
+    START = "start"
+    STOP = "stop"
+    RESET = "reset"
+
+class PipelineQueue(str, Enum):
+    """Pipeline queue enumeration."""
+    FRAMES = "frames"
+    DEBUG = "debug"
+
+class CustomConfigSchema(BaseModel):
+    """Schema for pipeline configuration validation."""
+    parameter1: str
+    parameter2: int
+
+class Pipeline(BasePipeline):
+    """Custom pipeline implementation."""
+
+    def __init__(self, pipeline_name: str) -> None:
+        """Initialize the pipeline.
+
+        Args:
+            pipeline_name: Name of the pipeline instance
+        """
+        super().__init__(pipeline_name)
+
+        # Define current state
+        self._current_state = PipelineState.IDLE
+
+    @property
+    def current_state(self) -> str:
+        """Get the current state of the pipeline.
+
+        Returns:
+            Current state as a string
+        """
+        return self._current_state.value
+
+    @classmethod
+    def get_available_signals(cls) -> List[str]:
+        """Get the list of available signals.
+
+        Returns:
+            List of signal names
+        """
+        return [signal.value for signal in PipelineSignal]
+
+    @classmethod
+    def get_available_states(cls) -> List[str]:
+        """Get the list of possible pipeline states.
+
+        Returns:
+            List of state names
+        """
+        return [state.value for state in PipelineState]
+
+    @classmethod
+    def get_available_queues(cls) -> List[str]:
+        """Get the list of available data queues.
+
+        Returns:
+            List of queue names
+        """
+        return [queue.value for queue in PipelineQueue]
+
+    @classmethod
+    def get_config_schema(cls) -> Dict[str, Any]:
+        """Get the configuration schema for this pipeline.
+
+        Returns:
+            Configuration schema as a dictionary
+        """
+        return CustomConfigSchema.schema()
+
+    def handle_signal(self, signal_name: str, **kwargs: Any) -> None:
+        """Handle incoming signals.
+
+        Args:
+            signal_name: Name of the signal to handle
+            **kwargs: Additional signal parameters
+        """
+        logger.info(f"Handling signal: {signal_name}")
+
+        if signal_name == PipelineSignal.START.value and self._current_state == PipelineState.IDLE:
+            self._current_state = PipelineState.INIT
+        elif signal_name == PipelineSignal.STOP.value:
+            self._current_state = PipelineState.IDLE
+        elif signal_name == PipelineSignal.RESET.value:
+            self._current_state = PipelineState.IDLE
+            # Reset any pipeline state here
+
+    def step(self) -> None:
+        """Execute a single pipeline step based on current state."""
+        if self._current_state == PipelineState.IDLE:
+            # Do nothing in IDLE state
+            pass
+
+        elif self._current_state == PipelineState.INIT:
+            logger.info("Initializing pipeline")
+            # Perform initialization tasks
+            self._current_state = PipelineState.RUNNING
+
+        elif self._current_state == PipelineState.RUNNING:
+            # Get data from data loader handler
+            data_loader = self.handlers.get("data_loader")
+            if data_loader:
+                # Get process parameters from config
+                data_loader_params = self.config.get("handlers", {}).get("data_loader", {}).get("process", {})
+                result = data_loader.process(**data_loader_params)
+
+                frame = None
+                if result and "frame" in result:
+                    frame = result["frame"]
+
+                if frame is None:
+                    return
+
+                # Process frame with your custom handlers
+                custom_handler = self.handlers.get("custom_handler")
+                if custom_handler:
+                    # Get custom handler process parameters
+                    custom_handler_params = self.config.get("handlers", {}).get("custom_handler", {}).get("process", {})
+                    result = custom_handler.process(frame=frame, **custom_handler_params)
+
+                    # Publish debug visualization if debug mode is enabled
+                    debug_image = result.get("debug_image")
+                    if debug_image is not None:
+                        self.publish_to_queue(
+                            PipelineQueue.DEBUG.value,
+                            base64.b64encode(debug_image.tobytes()).decode("utf-8") # assume debug_image is ndarray/cvimage
+                        )
+
+                    # Check for completion conditions
+                    if result.get("status") == "complete":
+                        self._current_state = PipelineState.COMPLETE
+
+                # Always publish the original frame to the frames queue
+                self.publish_to_queue(
+                    PipelineQueue.FRAMES.value,
+                    base64.b64encode(frame.tobytes()).decode("utf-8") # assue frame is ndarray/cvimage
+                )
+
+        elif self._current_state == PipelineState.COMPLETE:
+            logger.info("Pipeline execution complete")
+            self._current_state = PipelineState.IDLE
+```
+
+</details>
+
+### 3. Create Pipeline Configuration
+
+Define a `config.yaml` file for your pipeline's default configuration:
+
+<details>
+<summary>click to expand code: config.yaml</summary>
+
+```yaml
+Pipeline:
+  # Redis settings
+  redis:
+    host: "localhost"
+    port: 6379
+    db: 0
+    password: null
+
+  # Handler configuration
+  handlers:
+    data_loader:
+      init:
+        backend: "redis"  # will use redis settings from the above redis block
+      process:
+        wait: false
+
+    custom_handler:
+      init:
+        parameter1: "value1"
+        parameter2: 42
+      process:
+        debug: false
+```
+
+</details>
+
+### 4. Implement Custom Handlers
+
+Create your custom handlers in the `handlers` directory:
+
+<details>
+<summary>click to expand code: custom_handler.py</summary>
+
+```python
+# custom_handler.py
+from typing import Any, Dict
+
+from ....handlers.base import BaseHandler
+
+class CustomHandler(BaseHandler):
+    """Custom processing handler."""
+
+    def __init__(self, parameter1: str = "", parameter2: int = 0) -> None:
+        """Initialize the handler.
+
+        Args:
+            parameter1: First parameter
+            parameter2: Second parameter
+        """
+        self.parameter1 = parameter1
+        self.parameter2 = parameter2
+
+    def process(self, frame: Any = None, debug: bool = False) -> Dict[str, Any]:
+        """Process the input frame.
+
+        Args:
+            frame: Input frame to process
+            debug: Enable debug mode to visualize processing steps
+
+        Returns:
+            Processing results
+        """
+        # Implement your custom processing logic here
+        result = {
+            "data": None
+        }
+
+        # Example processing
+        if frame is not None:
+            # Do something with the frame
+            # ...
+            result["data"] = "Processed data"
+
+            # Optional debug visualization
+            if debug:
+                # Create debug visualizations for monitoring
+                result["debug_image"] = frame  # Example: return visualized frame
+
+        return result
+```
+
+</details>
+
+### 5. Register Handlers and Pipeline
+
+In your pipeline module's `__init__.py`, register the handlers and pipeline:
+
+```python
+from ....handlers import HandlerFactory
+from ...factory import PipelineFactory
+from .handlers.custom_handler import CustomHandler
+from .pipeline import Pipeline
+
+# Register custom handlers for this pipeline
+HandlerFactory.register_for_pipeline(Pipeline, "custom_handler", CustomHandler)
+
+# Register the pipeline with the factory
+PipelineFactory.register_pipeline("my_custom_pipeline", Pipeline)
+
+__all__ = ["Pipeline", "CustomHandler"]
+```
+
+### 6. Add Pipeline to Environment Configuration
+
+Add your pipeline to your environment configuration file (e.g., `backend/config/dev.yaml`):
+
+```yaml
+pipelines:
+  # Existing pipelines
+  yahboom_pick_and_place:
+    pipeline: yahboom_pick_and_place
+
+  # Your new pipeline
+  my_custom_pipeline:
+    pipeline: my_custom_pipeline
+    # Environment-specific overrides
+    handlers:
+      custom_handler:
+        init:
+          parameter1: "custom_value"
+```
+
+### 7. Using Your Custom Pipeline
+
+After implementation, you can use your pipeline through the API:
+
+```bash
+# Start your custom pipeline
+curl -X POST "http://localhost:8000/pipeline/start?pipeline_name=my_custom_pipeline"
+
+# Send signals to your pipeline
+curl -X POST "http://localhost:8000/pipeline/signal?pipeline_name=my_custom_pipeline&signal_name=start"
+```
+
+Or start it automatically when the server launches:
+
+```bash
+ENV=dev PIPELINE=my_custom_pipeline python main.py
+```
+
+This framework allows you to focus on implementing the specific business logic for your pipeline while leveraging the existing infrastructure for process management, configuration, and API integration.
+
 ## Next Steps
 
 - **Pipeline Configuration UI**: Add interfaces for modifying pipeline configurations
-- **Enhanced Visualization**: Add controls for display options and multi-queue visualization
-- **User Authentication**: Add secure access with role-based permissions
-- **Additional Robot Models**: Support for different robot arm models and configurations
-- **Performance Optimizations**: Improve frame rate control and network efficiency
-- **Real-time Analytics**: Add metrics and performance monitoring

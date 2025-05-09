@@ -127,23 +127,6 @@ python main.py
 ENV=dev PIPELINE=yahboom_pick_and_place python main.py
 ```
 
-### 运行流媒体客户端
-
-要将视频流传输到系统：
-
-```bash
-python -m examples.streaming --source webcam:0 --keep_size --lossless --enable_freeze --visualization --max-frames 100 --time-window 0.1
-```
-
-选项：
-- `--source`：视频文件、网络摄像头（webcam:0）或图像目录
-- `--keep_size`：保持原始图像尺寸
-- `--lossless`：使用无损编码帧
-- `--enable_freeze`：允许使用空格键暂停流
-- `--visualization`：显示带有可视化的视频流
-- `--max-frames`：设置 Redis 内存管理的最大帧数
-- `--time-window`：设置 Redis 内存管理的时间窗口（秒）
-
 ### API 端点
 
 系统公开以下 API 端点：
@@ -231,6 +214,44 @@ bun run start
 - 来自管道队列的实时帧可视化
 - 适用于不同设备的响应式布局
 
+## 运行流媒体客户端
+
+后端系统设计用于处理图像帧，但它需要数据源才能操作。一旦后端服务器运行起来，它会等待流数据输入，然后管道才能处理有意义的内容。
+
+要将数据流传输到系统：
+
+```bash
+python -m examples.streaming --source webcam:0 --keep_size --lossless --enable_freeze --visualization --max-frames 100 --time-window 0.1
+```
+
+选项：
+- `--source`：视频文件、网络摄像头（webcam:0）或图像目录
+- `--keep_size`：保持原始图像尺寸
+- `--lossless`：使用无损编码帧
+- `--enable_freeze`：允许使用空格键暂停流
+- `--visualization`：显示带有可视化的视频流
+- `--max-frames`：设置 Redis 内存管理的最大帧数
+- `--time-window`：设置 Redis 内存管理的时间窗口（秒）
+
+### 完整数据流
+
+运行完整系统时：
+
+1. **流媒体客户端**从摄像头或视频文件捕获帧并将其发送到 Redis
+2. **后端管道**通过其 DataLoaderHandler 接收这些帧
+3. **管道处理器**处理帧（检测、控制计算等）
+4. **前端仪表板**通过以下方式连接到后端：
+   - REST API 用于管道操作（启动/停止）
+   - WebSocket 用于实时更新和帧数据
+
+使用此设置，您可以：
+- 从仪表板启动管道
+- 发送控制信号以更改管道行为
+- 实时可视化流帧和处理结果
+- 查看机械臂响应检测到的物体
+
+前端连接到每个管道的发布队列，使您能够监控管道"看到"的内容以及它如何处理数据。
+
 ## Git 钩子设置
 
 该项目使用 git 钩子来确保代码质量和一致的提交消息。
@@ -256,11 +277,349 @@ bun run start
 - **pre-commit**：对前端和后端代码运行 lint 和格式化检查
 - **commit-msg**：根据约定式提交格式验证提交消息
 
+## 实现自定义管道
+
+Modulus 机械臂控制系统设计为可通过自定义管道扩展。以下是实现自己的管道的方法：
+
+### 1. 创建新的管道模块
+
+在 `backend/lib/pipelines/` 下为您的管道创建一个新目录：
+
+```
+backend/lib/pipelines/my_custom_pipeline/
+├── __init__.py
+├── config.yaml
+├── handlers/
+│   ├── __init__.py
+│   └── custom_handler.py
+└── pipeline.py
+```
+
+### 2. 实现您的管道类
+
+创建一个实现管道状态机的 `pipeline.py` 文件：
+
+<details>
+<summary>点击展开代码: pipeline.py</summary>
+
+```python
+from typing import Dict, List, Optional, Any, Set
+import json
+from enum import Enum, auto
+from pydantic import BaseModel
+
+from ...utils.logger import get_logger
+from ..base import BasePipeline
+
+logger = get_logger("my_custom_pipeline")
+
+class PipelineState(str, Enum):
+    """管道状态枚举。"""
+    IDLE = "IDLE"
+    INIT = "INIT"
+    RUNNING = "RUNNING"
+    COMPLETE = "COMPLETE"
+
+class PipelineSignal(str, Enum):
+    """管道信号枚举。"""
+    START = "start"
+    STOP = "stop"
+    RESET = "reset"
+
+class PipelineQueue(str, Enum):
+    """管道队列枚举。"""
+    FRAMES = "frames"
+    DEBUG = "debug"
+
+class CustomConfigSchema(BaseModel):
+    """管道配置验证的模式。"""
+    parameter1: str
+    parameter2: int
+
+class Pipeline(BasePipeline):
+    """自定义管道实现。"""
+
+    def __init__(self, pipeline_name: str) -> None:
+        """初始化管道。
+
+        参数:
+            pipeline_name: 管道实例的名称
+        """
+        super().__init__(pipeline_name)
+
+        # 定义当前状态
+        self._current_state = PipelineState.IDLE
+
+    @property
+    def current_state(self) -> str:
+        """获取管道的当前状态。
+
+        返回:
+            当前状态的字符串表示
+        """
+        return self._current_state.value
+
+    @classmethod
+    def get_available_signals(cls) -> List[str]:
+        """获取可用信号列表。
+
+        返回:
+            信号名称列表
+        """
+        return [signal.value for signal in PipelineSignal]
+
+    @classmethod
+    def get_available_states(cls) -> List[str]:
+        """获取可能的管道状态列表。
+
+        返回:
+            状态名称列表
+        """
+        return [state.value for state in PipelineState]
+
+    @classmethod
+    def get_available_queues(cls) -> List[str]:
+        """获取可用数据队列列表。
+
+        返回:
+            队列名称列表
+        """
+        return [queue.value for queue in PipelineQueue]
+
+    @classmethod
+    def get_config_schema(cls) -> Dict[str, Any]:
+        """获取此管道的配置模式。
+
+        返回:
+            作为字典的配置模式
+        """
+        return CustomConfigSchema.schema()
+
+    def handle_signal(self, signal_name: str, **kwargs: Any) -> None:
+        """处理传入的信号。
+
+        参数:
+            signal_name: 要处理的信号名称
+            **kwargs: 附加的信号参数
+        """
+        logger.info(f"处理信号: {signal_name}")
+
+        if signal_name == PipelineSignal.START.value and self._current_state == PipelineState.IDLE:
+            self._current_state = PipelineState.INIT
+        elif signal_name == PipelineSignal.STOP.value:
+            self._current_state = PipelineState.IDLE
+        elif signal_name == PipelineSignal.RESET.value:
+            self._current_state = PipelineState.IDLE
+            # 在此重置任何管道状态
+
+    def step(self) -> None:
+        """根据当前状态执行单个管道步骤。"""
+        if self._current_state == PipelineState.IDLE:
+            # 在 IDLE 状态下不做任何事情
+            pass
+
+        elif self._current_state == PipelineState.INIT:
+            logger.info("初始化管道")
+            # 执行初始化任务
+            self._current_state = PipelineState.RUNNING
+
+        elif self._current_state == PipelineState.RUNNING:
+            # 从数据加载器处理器获取数据
+            data_loader = self.handlers.get("data_loader")
+            if data_loader:
+                # 从配置获取处理参数
+                data_loader_params = self.config.get("handlers", {}).get("data_loader", {}).get("process", {})
+                result = data_loader.process(**data_loader_params)
+
+                frame = None
+                if result and "frame" in result:
+                    frame = result["frame"]
+
+                if frame is None:
+                    return
+
+                # 使用自定义处理器处理帧
+                custom_handler = self.handlers.get("custom_handler")
+                if custom_handler:
+                    # 获取自定义处理器处理参数
+                    custom_handler_params = self.config.get("handlers", {}).get("custom_handler", {}).get("process", {})
+                    result = custom_handler.process(frame=frame, **custom_handler_params)
+
+                    # 如果启用了调试模式，发布调试可视化
+                    debug_image = result.get("debug_image")
+                    if debug_image is not None:
+                        self.publish_to_queue(
+                            PipelineQueue.DEBUG.value,
+                            base64.b64encode(debug_image.tobytes()).decode("utf-8") # 假设 debug_image 是 ndarray/cvimage
+                        )
+
+                    # 检查完成条件
+                    if result.get("status") == "complete":
+                        self._current_state = PipelineState.COMPLETE
+
+                # 始终将原始帧发布到 frames 队列
+                self.publish_to_queue(
+                    PipelineQueue.FRAMES.value,
+                    base64.b64encode(frame.tobytes()).decode("utf-8") # 假设 frame 是 ndarray/cvimage
+                )
+
+        elif self._current_state == PipelineState.COMPLETE:
+            logger.info("管道执行完成")
+            self._current_state = PipelineState.IDLE
+```
+
+</details>
+
+### 3. 创建管道配置
+
+为您的管道的默认配置定义一个 `config.yaml` 文件：
+
+<details>
+<summary>点击展开代码: config.yaml</summary>
+
+```yaml
+Pipeline:
+  # Redis 设置
+  redis:
+    host: "localhost"
+    port: 6379
+    db: 0
+    password: null
+
+  # 处理器配置
+  handlers:
+    data_loader:
+      init:
+        backend: "redis"  # 将使用上面 redis 块中的 redis 设置
+      process:
+        wait: false
+
+    custom_handler:
+      init:
+        parameter1: "value1"
+        parameter2: 42
+      process:
+        debug: false
+```
+
+</details>
+
+### 4. 实现自定义处理器
+
+在 `handlers` 目录中创建您的自定义处理器：
+
+<details>
+<summary>点击展开代码: custom_handler.py</summary>
+
+```python
+# custom_handler.py
+from typing import Any, Dict
+
+from ....handlers.base import BaseHandler
+
+class CustomHandler(BaseHandler):
+    """自定义处理处理器。"""
+
+    def __init__(self, parameter1: str = "", parameter2: int = 0) -> None:
+        """初始化处理器。
+
+        参数:
+            parameter1: 第一个参数
+            parameter2: 第二个参数
+        """
+        self.parameter1 = parameter1
+        self.parameter2 = parameter2
+
+    def process(self, frame: Any = None, debug: bool = False) -> Dict[str, Any]:
+        """处理输入帧。
+
+        参数:
+            frame: 要处理的输入帧
+            debug: 启用调试模式以可视化处理步骤
+
+        返回:
+            处理结果
+        """
+        # 在此实现您的自定义处理逻辑
+        result = {
+            "data": None
+        }
+
+        # 示例处理
+        if frame is not None:
+            # 对帧做一些操作
+            # ...
+            result["data"] = "已处理的数据"
+
+            # 可选的调试可视化
+            if debug:
+                # 创建用于监控的调试可视化
+                result["debug_image"] = frame  # 示例：返回可视化帧
+
+        return result
+```
+
+</details>
+
+### 5. 注册处理器和管道
+
+在您的管道模块的 `__init__.py` 中，注册处理器和管道：
+
+```python
+from ....handlers import HandlerFactory
+from ...factory import PipelineFactory
+from .handlers.custom_handler import CustomHandler
+from .pipeline import Pipeline
+
+# 为此管道注册自定义处理器
+HandlerFactory.register_for_pipeline(Pipeline, "custom_handler", CustomHandler)
+
+# 向工厂注册管道
+PipelineFactory.register_pipeline("my_custom_pipeline", Pipeline)
+
+__all__ = ["Pipeline", "CustomHandler"]
+```
+
+### 6. 将管道添加到环境配置
+
+将您的管道添加到您的环境配置文件中（例如，`backend/config/dev.yaml`）：
+
+```yaml
+pipelines:
+  # 现有管道
+  yahboom_pick_and_place:
+    pipeline: yahboom_pick_and_place
+
+  # 您的新管道
+  my_custom_pipeline:
+    pipeline: my_custom_pipeline
+    # 环境特定的覆盖
+    handlers:
+      custom_handler:
+        init:
+          parameter1: "custom_value"
+```
+
+### 7. 使用您的自定义管道
+
+实现后，您可以通过 API 使用您的管道：
+
+```bash
+# 启动您的自定义管道
+curl -X POST "http://localhost:8000/pipeline/start?pipeline_name=my_custom_pipeline"
+
+# 向您的管道发送信号
+curl -X POST "http://localhost:8000/pipeline/signal?pipeline_name=my_custom_pipeline&signal_name=start"
+```
+
+或者在服务器启动时自动启动：
+
+```bash
+ENV=dev PIPELINE=my_custom_pipeline python main.py
+```
+
+这个框架允许您专注于实现管道的特定业务逻辑，同时利用现有的基础设施进行流程管理、配置和 API 集成。
+
 ## 下一步
 
 - **管道配置 UI**：添加用于修改管道配置的界面
-- **增强可视化**：添加显示选项和多队列可视化的控件
-- **用户认证**：添加基于角色的安全访问权限
-- **额外的机器人模型**：支持不同的机械臂模型和配置
-- **性能优化**：改进帧率控制和网络效率
-- **实时分析**：添加指标和性能监控
