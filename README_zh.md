@@ -585,19 +585,18 @@ __all__ = ["Pipeline", "CustomHandler"]
 将您的管道添加到您的环境配置文件中（例如，`backend/config/dev.yaml`）：
 
 ```yaml
-pipelines:
-  # 现有管道
-  yahboom_pick_and_place:
-    pipeline: yahboom_pick_and_place
+# 现有管道
+yahboom_pick_and_place:
+   pipeline: yahboom_pick_and_place
 
-  # 您的新管道
-  my_custom_pipeline:
-    pipeline: my_custom_pipeline
-    # 环境特定的覆盖
-    handlers:
-      custom_handler:
-        init:
-          parameter1: "custom_value"
+# 您的新管道
+my_custom_pipeline:
+   pipeline: my_custom_pipeline
+   # 环境特定的覆盖
+   handlers:
+   custom_handler:
+      init:
+         parameter1: "custom_value"
 ```
 
 ### 7. 使用您的自定义管道

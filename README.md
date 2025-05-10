@@ -585,19 +585,18 @@ __all__ = ["Pipeline", "CustomHandler"]
 Add your pipeline to your environment configuration file (e.g., `backend/config/dev.yaml`):
 
 ```yaml
-pipelines:
-  # Existing pipelines
-  yahboom_pick_and_place:
-    pipeline: yahboom_pick_and_place
+# Existing pipelines
+yahboom_pick_and_place:
+   pipeline: yahboom_pick_and_place
 
-  # Your new pipeline
-  my_custom_pipeline:
-    pipeline: my_custom_pipeline
-    # Environment-specific overrides
-    handlers:
-      custom_handler:
-        init:
-          parameter1: "custom_value"
+# Your new pipeline
+my_custom_pipeline:
+   pipeline: my_custom_pipeline
+   # Environment-specific overrides
+   handlers:
+   custom_handler:
+      init:
+         parameter1: "custom_value"
 ```
 
 ### 7. Using Your Custom Pipeline
