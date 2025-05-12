@@ -46,7 +46,7 @@ class ArmControlHandler(BaseHandler):
         self._reset()
 
     def _reset(self) -> None:
-        self.mc.send_angles(self.init_angles, 40)
+        self.mc.send_angles(self.init_angles, 30)
         time.sleep(0.5)
 
     def _move_to_coord(
@@ -111,8 +111,8 @@ class ArmControlHandler(BaseHandler):
             if self.task == "pick_and_place":
                 coords = self.coord_config["place"][label]
             elif self.task == "pick_and_stack":
-                coords = self.coord_config["stack"]["first"]
-                coords[2] += self.coord_config["stack"]["delta_z"] * (len(done) - 1)
+                coords = self.coord_config["stack"]["first"].copy()
+                coords[2] += self.coord_config["stack"]["delta_z"] * len(done)
 
             x, y, z, rx, ry, rz = coords
 

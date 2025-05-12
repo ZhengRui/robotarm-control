@@ -25,6 +25,7 @@ dev = [
     "ruff>=0.11.6",
     "types-pyyaml>=6.0.12.20241230",
     "types-requests>=2.32.0.20241016",
+    "watchfiles>=0.24.0",
 ]
 
 [tool.ruff]
