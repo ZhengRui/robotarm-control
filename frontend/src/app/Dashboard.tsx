@@ -76,8 +76,6 @@ const Dashboard = () => {
 
   // Check if pipeline is running but websocket is disconnected
   useEffect(() => {
-    // Only attempt reconnection when the pipeline is running AND we're in a disconnected state
-    // NOT when we're already connecting or any other state transitions
     if (
       pipelineRunning &&
       selectedPipelineName &&
@@ -99,6 +97,12 @@ const Dashboard = () => {
     connectionStatus === "disconnected",
     reconnect,
   ]);
+
+  // Reset selected signal when pipeline changes
+  useEffect(() => {
+    // Clear the selected signal when pipeline changes
+    setSelectedSignal(null);
+  }, [selectedPipelineName, setSelectedSignal]);
 
   const MIN_SIZE_IN_PIXELS = 400;
   const MAX_SIZE_IN_PIXELS = 500;
@@ -318,7 +322,7 @@ const Dashboard = () => {
                             ? "opacity-50 cursor-not-allowed"
                             : "cursor-pointer",
                           signal === selectedSignal
-                            ? "bg-primary text-primary-foreground hover:bg-primary/90 border border-transparent"
+                            ? "border-2 border-black bg-background text-foreground hover:bg-background/90"
                             : "border border-muted bg-background hover:bg-muted/80 text-muted-foreground"
                         )}
                       >
@@ -564,7 +568,7 @@ const Dashboard = () => {
                                 ? "opacity-50 cursor-not-allowed"
                                 : "cursor-pointer",
                               signal === selectedSignal
-                                ? "bg-primary text-primary-foreground hover:bg-primary/90 border border-transparent"
+                                ? "border-2 border-black bg-background text-foreground hover:bg-background/90"
                                 : "border border-muted bg-background hover:bg-muted/80 text-muted-foreground"
                             )}
                           >
