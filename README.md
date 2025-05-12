@@ -113,6 +113,117 @@ Edit these files to adjust settings like:
 - Redis connection settings
 - Debug settings for specific handlers
 
+### Redis Server Setup
+
+Redis is required for data streaming and pipeline communication. Follow these steps to install and configure Redis:
+
+1. **Install Redis**:
+
+   **On Ubuntu/Debian**:
+   ```bash
+   sudo apt update
+   sudo apt install redis-server
+   ```
+
+   **On macOS**:
+   ```bash
+   brew install redis
+   ```
+
+   **On Windows**:
+   Install using Windows Subsystem for Linux (WSL) or download from [Redis for Windows](https://github.com/microsoftarchive/redis/releases).
+
+2. **Start Redis**:
+
+   **On Ubuntu/Debian**:
+   ```bash
+   sudo systemctl start redis-server
+   ```
+
+   **On macOS**:
+   ```bash
+   brew services start redis
+   ```
+
+   **On Windows**:
+   Run the redis-server.exe application.
+
+3. **Verify Installation**:
+   ```bash
+   redis-cli ping
+   ```
+
+   You should receive a `PONG` response.
+
+4. **Configure Redis for Remote Connections** (Optional, only if accessing Redis from other machines):
+
+   Edit the Redis configuration file:
+
+   **On Ubuntu/Debian**:
+   ```bash
+   sudo nano /etc/redis/redis.conf
+   ```
+
+   **On macOS**:
+   ```bash
+   nano $(brew --prefix)/etc/redis.conf
+   ```
+
+   Make the following changes:
+   - Change `bind 127.0.0.1` to `bind 0.0.0.0` to allow connections from any IP
+   - Set `protected-mode no` to disable protected mode (required for Redis 6.0 and newer)
+   - Optionally, set a password by uncommenting the `requirepass` line and adding a strong password
+
+   Save and restart Redis:
+
+   **On Ubuntu/Debian**:
+   ```bash
+   sudo systemctl restart redis-server
+   ```
+
+   **On macOS**:
+   ```bash
+   brew services restart redis
+   ```
+
+   Remember to update the Redis connection settings in your environment configuration file if you set a password.
+
+5. The default configuration in the project uses localhost:6379. If you need to change these settings, update them in your environment's configuration file.
+
+### Remote Robot Control Setup
+
+This setup is **only needed when the robot arm is connected to a different machine** than the one running the backend server. If your robot arm is directly connected to the machine running the backend, you can skip this section.
+
+If you're using a remote robot control configuration (with `remote_addr` set in your configuration file):
+
+1. **Download the Server_280.py script**:
+
+   Download the MyCobot280 remote control server script from:
+   ```
+   https://github.com/modulus-inc/modulus-robotarm-control/blob/main/demo/Server_280.py
+   ```
+
+2. **Run the script on the remote machine**:
+
+   The remote machine needs to be physically connected to the robot arm.
+   ```bash
+   # On the remote machine
+   python Server_280.py
+   ```
+
+3. **Configure your environment**:
+
+   Make sure your `dev.yaml` or `prod.yaml` file has the `remote_addr` set to the IP address of the remote machine.
+   ```yaml
+   # Example configuration
+   handlers:
+     robot_control:
+       init:
+         remote_addr: "192.168.1.100"  # IP address of remote machine
+   ```
+
+This setup enables the backend to send control commands to a remote machine that is directly connected to the robot arm.
+
 ### Starting the Backend Server
 
 Start the server:

@@ -28,4 +28,27 @@ yahboom_pick_and_place:
           blue: [[100, 43, 46], [124, 255, 255]]
           yellow: [[26, 43, 46], [34, 255, 255]]
 
-    # arm_control configs ...
+    arm_control:
+      init:
+        remote_addr: "192.168.1.34"
+        task: "pick_and_place"
+        grasp_offset: [-0.02, -0.005]
+        init_angles: [43, 0, 0, -80, -6, -6]
+        coord_config:
+          pre_grasp_z: 180
+          grasp_z: 130
+          post_grasp_z: 200
+          place:
+            red: [75, 230, 130, -175, 0, -45]
+            green: [10, 230, 130, -175, 0, -45]
+            blue: [-70, 230, 130, -175, 0, -45]
+            yellow: [140, 230, 130, -175, 0, -45]
+          stack:
+            first: [135, -155, 130, -175, 0, -45]
+            delta_z: 30
+        gripper_config:
+          open: 100
+          close: 10
+      process:
+        speed: 20
+        delay: 3

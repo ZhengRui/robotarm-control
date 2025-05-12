@@ -113,6 +113,117 @@ cp backend/config/prod.example.yaml backend/config/prod.yaml
 - Redis 连接设置
 - 特定处理器的调试设置
 
+### Redis 服务器设置
+
+Redis 是数据流传输和管道通信所必需的。按照以下步骤安装和配置 Redis：
+
+1. **安装 Redis**：
+
+   **Ubuntu/Debian 系统**：
+   ```bash
+   sudo apt update
+   sudo apt install redis-server
+   ```
+
+   **macOS 系统**：
+   ```bash
+   brew install redis
+   ```
+
+   **Windows 系统**：
+   通过 Windows Subsystem for Linux (WSL) 安装或从 [Redis for Windows](https://github.com/microsoftarchive/redis/releases) 下载。
+
+2. **启动 Redis**：
+
+   **Ubuntu/Debian 系统**：
+   ```bash
+   sudo systemctl start redis-server
+   ```
+
+   **macOS 系统**：
+   ```bash
+   brew services start redis
+   ```
+
+   **Windows 系统**：
+   运行 redis-server.exe 应用程序。
+
+3. **验证安装**：
+   ```bash
+   redis-cli ping
+   ```
+
+   您应该收到 `PONG` 响应。
+
+4. **配置 Redis 允许远程连接**（可选，仅当从其他机器访问 Redis 时需要）：
+
+   编辑 Redis 配置文件：
+
+   **Ubuntu/Debian 系统**：
+   ```bash
+   sudo nano /etc/redis/redis.conf
+   ```
+
+   **macOS 系统**：
+   ```bash
+   nano $(brew --prefix)/etc/redis.conf
+   ```
+
+   进行以下更改：
+   - 将 `bind 127.0.0.1` 更改为 `bind 0.0.0.0` 以允许来自任何 IP 的连接
+   - 设置 `protected-mode no` 以禁用保护模式（Redis 6.0 及更新版本需要）
+   - 可选，通过取消注释 `requirepass` 行并添加强密码来设置密码
+
+   保存并重启 Redis：
+
+   **Ubuntu/Debian 系统**：
+   ```bash
+   sudo systemctl restart redis-server
+   ```
+
+   **macOS 系统**：
+   ```bash
+   brew services restart redis
+   ```
+
+   如果您设置了密码，请记得在环境配置文件中更新 Redis 连接设置。
+
+5. 项目中的默认配置使用 localhost:6379。如果需要更改这些设置，请在环境配置文件中更新。
+
+### 远程机器人控制设置
+
+**此设置仅在机械臂连接到与运行后端服务器的机器不同的机器时才需要**。如果您的机械臂直接连接到运行后端的机器，可以跳过此部分。
+
+如果您使用远程机器人控制配置（在配置文件中设置了 `remote_addr`）：
+
+1. **下载 Server_280.py 脚本**：
+
+   从以下位置下载 MyCobot280 远程控制服务器脚本：
+   ```
+   https://github.com/modulus-inc/modulus-robotarm-control/blob/main/demo/Server_280.py
+   ```
+
+2. **在远程机器上运行脚本**：
+
+   远程机器需要物理连接到机械臂。
+   ```bash
+   # 在远程机器上
+   python Server_280.py
+   ```
+
+3. **配置您的环境**：
+
+   确保您的 `dev.yaml` 或 `prod.yaml` 文件中将 `remote_addr` 设置为远程机器的 IP 地址。
+   ```yaml
+   # 配置示例
+   handlers:
+     robot_control:
+       init:
+         remote_addr: "192.168.1.100"  # 远程机器的 IP 地址
+   ```
+
+这种设置使后端能够将控制命令发送到直接连接到机械臂的远程机器。
+
 ### 启动后端服务器
 
 启动服务器：
