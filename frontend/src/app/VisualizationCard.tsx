@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useAtom } from "jotai";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -24,9 +24,17 @@ type QueueData = {
 const VisualizationCard = () => {
   const [selectedPipelineName] = useAtom(selectedPipelineNameAtom);
   const { data: pipelineData } = useGetPipeline(selectedPipelineName, true);
+  const prevPipelineNameRef = useRef<string | null>(null);
 
-  // Only the selected queues need to be local state
-  const [selectedQueues, setSelectedQueues] = useState<string[]>([]);
+  // Track selected queues for each pipeline
+  // This maintains which queues were selected for each pipeline
+  // so when switching between pipelines, the previously selected queues are remembered
+  const [pipelineQueueSelections, setPipelineQueueSelections] = useState<
+    Record<string, string[]>
+  >({});
+
+  // Active queues for the current pipeline
+  const [activeQueues, setActiveQueues] = useState<string[]>([]);
 
   // Store queue data received from websockets
   const [queueDataMap, setQueueDataMap] = useState<Record<string, QueueData>>(
@@ -37,9 +45,74 @@ const VisualizationCard = () => {
   const pipelineRunning = pipelineData?.running || false;
   const pipelineQueues = pipelineData?.available_queues || [];
 
+  // Effect to update active queues when the pipeline changes
+  useEffect(() => {
+    // Only run this effect when the pipeline name actually changes
+    if (selectedPipelineName !== prevPipelineNameRef.current) {
+      console.log(
+        `Pipeline changed from ${prevPipelineNameRef.current} to ${selectedPipelineName}`
+      );
+
+      // First save the current queues for the previous pipeline (if any)
+      const previousPipeline = prevPipelineNameRef.current;
+      if (previousPipeline) {
+        // Create a stable local copy of current activeQueues to prevent race conditions
+        const currentQueues = [...activeQueues];
+        if (currentQueues.length > 0) {
+          setPipelineQueueSelections((prev) => {
+            // Create a new object to avoid mutation
+            const updated = { ...prev };
+            updated[previousPipeline] = currentQueues;
+            return updated;
+          });
+        }
+      }
+
+      // Clear queue data immediately when switching pipelines
+      setQueueDataMap({});
+
+      // Then set the new active queues based on the new pipeline
+      if (selectedPipelineName) {
+        // Get the saved queues for the new pipeline (if any)
+        const savedQueues = pipelineQueueSelections[selectedPipelineName] || [];
+        // Update active queues with the saved queues
+        setActiveQueues(savedQueues);
+      } else {
+        setActiveQueues([]);
+      }
+
+      // Finally update the reference to the current pipeline
+      prevPipelineNameRef.current = selectedPipelineName;
+    }
+  }, [selectedPipelineName, pipelineQueueSelections]);
+
+  // Separate effect to handle updating queue selections when active queues change
+  // This prevents race conditions when switching pipelines
+  useEffect(() => {
+    // Only save if we have a current pipeline and there was no pipeline change
+    if (
+      selectedPipelineName &&
+      selectedPipelineName === prevPipelineNameRef.current
+    ) {
+      // Update the saved selections for current pipeline when queues change
+      setPipelineQueueSelections((prev) => ({
+        ...prev,
+        [selectedPipelineName]: [...activeQueues],
+      }));
+    }
+  }, [selectedPipelineName, activeQueues]);
+
   // Handle queue selection (now supports multi-select)
   const handleQueueSelection = (newSelection: string[]) => {
-    setSelectedQueues(newSelection);
+    setActiveQueues(newSelection);
+
+    // Also update the saved selections for current pipeline
+    if (selectedPipelineName) {
+      setPipelineQueueSelections((prev) => ({
+        ...prev,
+        [selectedPipelineName]: newSelection,
+      }));
+    }
   };
 
   // Create a callback for handling queue data
@@ -53,7 +126,7 @@ const VisualizationCard = () => {
   // Use our imported hook to manage queue connections
   useQueueWebSockets(
     selectedPipelineName,
-    selectedQueues,
+    activeQueues,
     pipelineRunning,
     handleQueueData
   );
@@ -105,7 +178,7 @@ const VisualizationCard = () => {
             <h3 className="text-sm font-semibold">Stream Queues</h3>
             <MultiSelect
               label="Stream Queues"
-              selectedValues={selectedQueues}
+              selectedValues={activeQueues}
               options={selectedPipelineName ? pipelineQueues : []}
               onChange={handleQueueSelection}
               disabled={!selectedPipelineName || !pipelineRunning}
@@ -114,16 +187,23 @@ const VisualizationCard = () => {
           </div>
 
           {/* Selected queue tags display */}
-          {selectedQueues.length > 0 && (
+          {activeQueues.length > 0 && (
             <TagsContainer>
-              {selectedQueues.map((queue) => (
+              {activeQueues.map((queue) => (
                 <Tag
                   key={queue}
                   label={queue}
                   onRemove={() => {
-                    setSelectedQueues(
-                      selectedQueues.filter((q) => q !== queue)
-                    );
+                    const newQueues = activeQueues.filter((q) => q !== queue);
+                    setActiveQueues(newQueues);
+
+                    // Also update saved selections
+                    if (selectedPipelineName) {
+                      setPipelineQueueSelections((prev) => ({
+                        ...prev,
+                        [selectedPipelineName]: newQueues,
+                      }));
+                    }
                   }}
                 />
               ))}
@@ -133,9 +213,9 @@ const VisualizationCard = () => {
 
         <div className="flex-1 overflow-y-auto">
           {selectedPipelineName ? (
-            selectedQueues.length > 0 ? (
+            activeQueues.length > 0 ? (
               <div className="w-full grid grid-cols-1 md:grid-cols-2 gap-4">
-                {selectedQueues.map((queueName) => (
+                {activeQueues.map((queueName) => (
                   <div
                     key={queueName}
                     className="border rounded-md p-3 bg-white shadow-sm"

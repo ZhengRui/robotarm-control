@@ -34,6 +34,9 @@ class ConnectionManager:
         # Background tasks
         self.tasks: List[asyncio.Task] = []
 
+        # Track Redis subscription tasks by pipeline:queue
+        self.subscription_tasks: Dict[str, asyncio.Task] = {}
+
         # Redis client
         self.redis: Dict[str, Any] = {}
 
@@ -141,6 +144,15 @@ class ConnectionManager:
 
                     # Clean up if no connections left for this queue
                     if not self.queue_connections[pipeline_name][queue_name]:
+                        # Cancel the subscription task for this queue
+                        task_key = f"{pipeline_name}:{queue_name}"
+                        if task_key in self.subscription_tasks:
+                            task = self.subscription_tasks[task_key]
+                            if not task.done():
+                                logger.info(f"Cancelling Redis subscription task for {task_key}")
+                                task.cancel()
+                            del self.subscription_tasks[task_key]
+
                         del self.queue_connections[pipeline_name][queue_name]
 
                     # Clean up if no queues left for this pipeline
@@ -268,11 +280,22 @@ class ConnectionManager:
         # Start background task for pub/sub subscription
         channel = f"pipeline:{pipeline_name}:queue:{queue_name}"
 
+        # Check if we already have a subscription for this channel
+        task_key = f"{pipeline_name}:{queue_name}"
+        if task_key in self.subscription_tasks and not self.subscription_tasks[task_key].done():
+            logger.info(f"Subscription already exists for {channel}")
+            return
+
         # Create a task for pub/sub subscription
         pubsub_task = asyncio.create_task(
             self._subscribe_to_redis_channel(pipeline_name, queue_name, channel, redis_client)
         )
+
+        # Store in both task collections
         self.tasks.append(pubsub_task)
+        self.subscription_tasks[task_key] = pubsub_task
+
+        logger.info(f"Created new subscription task for {channel}")
 
     async def _subscribe_to_redis_channel(
         self,
@@ -464,6 +487,9 @@ class ConnectionManager:
         for task in self.tasks:
             if not task.done():
                 task.cancel()
+
+        # Clear subscription tasks
+        self.subscription_tasks.clear()
 
         # Close all Redis connections
         for pipeline_name, redis_client in self.redis.items():
