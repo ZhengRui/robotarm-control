@@ -112,7 +112,7 @@ const Dashboard = () => {
 
     if (checked) {
       startPipeline(
-        { pipelineName: selectedPipelineName, debug: false },
+        { pipelineName: selectedPipelineName },
         {
           onError: (error) => console.error("Failed to start pipeline:", error),
         }

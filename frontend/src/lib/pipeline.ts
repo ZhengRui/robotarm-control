@@ -28,8 +28,8 @@ export const getPipeline = requestTemplate(
 );
 
 export const startPipeline = requestTemplate(
-  (pipelineName: string, debug: boolean = false) => ({
-    url: `${apiEndpoint}/pipeline/start?pipeline_name=${pipelineName}&debug=${debug}`,
+  (pipelineName: string) => ({
+    url: `${apiEndpoint}/pipeline/start?pipeline_name=${pipelineName}`,
     method: "POST",
     headers: new Headers({
       "Content-Type": "application/json",
