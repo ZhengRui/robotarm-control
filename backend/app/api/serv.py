@@ -53,7 +53,17 @@ async def get_pipelines(with_meta: bool = False):
         if with_meta and isinstance(pipeline_status, dict):
             pipeline_type = pipeline_config.get("pipeline", pipeline_name)
             meta = PipelineFactory.get_meta(pipeline_type)
-            pipeline_status.update(meta)
+
+            # Instance metadata takes precedence over class metadata
+            for key in ["available_states", "available_signals", "available_queues"]:
+                if key not in pipeline_status:
+                    # Only use class metadata if instance metadata is not available
+                    pipeline_status[key] = meta.get(key, [])
+
+            # Add other metadata (config_schema, etc.)
+            for key, value in meta.items():
+                if key not in ["available_states", "available_signals", "available_queues"]:
+                    pipeline_status[key] = value
 
         pipelines.append(pipeline_status)
 
@@ -77,7 +87,17 @@ async def get_pipeline(pipeline_name: str, with_meta: bool = False):
         if with_meta and isinstance(pipeline_status, dict):
             pipeline_type = config[pipeline_name].get("pipeline", pipeline_name)
             meta = PipelineFactory.get_meta(pipeline_type)
-            pipeline_status.update(meta)
+
+            # Instance metadata takes precedence over class metadata
+            for key in ["available_states", "available_signals", "available_queues"]:
+                if key not in pipeline_status:
+                    # Only use class metadata if instance metadata is not available
+                    pipeline_status[key] = meta.get(key, [])
+
+            # Add other metadata (config_schema, etc.)
+            for key, value in meta.items():
+                if key not in ["available_states", "available_signals", "available_queues"]:
+                    pipeline_status[key] = value
 
         return pipeline_status
     except ValueError as e:

@@ -20,6 +20,7 @@ class PipelineState(Enum):
     CALIBRATING = "calibrating"
     DETECTING = "detecting"
     PICKING_PLACING = "picking_placing"
+    PICKING_STACKING = "picking_stacking"
     STOPPED = "stopped"
 
 
@@ -30,6 +31,7 @@ class PipelineSignal(Enum):
     RE_CALIBRATE = "re_calibrate"
     CALIBRATION_CONFIRMED = "calibration_confirmed"
     PICK_PLACE = "pick_place"
+    PICK_STACK = "pick_stack"
     STOP = "stop"
 
 
@@ -55,6 +57,7 @@ class Pipeline(BasePipeline):
     - "re_calibrate": Re-calibrate the robot arm
     - "calibration_confirmed": Transition from CALIBRATING to DETECTING
     - "pick_place": Transition from DETECTING to PICKING_PLACING
+    - "pick_stack": Transition from DETECTING to PICKING_STACKING
     - "stop": Stop the pipeline
     """
 
@@ -170,6 +173,10 @@ class Pipeline(BasePipeline):
             logger.info("Starting pick and place operation")
             self.state = PipelineState.PICKING_PLACING
 
+        elif signal == PipelineSignal.PICK_STACK.value and self.state == PipelineState.DETECTING:
+            logger.info("Starting pick and stack operation")
+            self.state = PipelineState.PICKING_STACKING
+
         elif signal == PipelineSignal.STOP.value:
             logger.info("Stopping pipeline due to stop signal")
             self.state = PipelineState.STOPPED
@@ -211,6 +218,9 @@ class Pipeline(BasePipeline):
 
         elif self.state == PipelineState.PICKING_PLACING:
             self._process_pick_and_place()
+
+        elif self.state == PipelineState.PICKING_STACKING:
+            self._process_pick_and_stack()
 
     def _get_latest_frame(self) -> None:
         """Get the latest frame from the dataloader handler.
@@ -340,3 +350,74 @@ class Pipeline(BasePipeline):
 
         except Exception as e:
             logger.error(f"Error in pick and place operation: {e}")
+
+    def _process_pick_and_stack(self) -> None:
+        """Process pick and stack operation with the arm control handler."""
+        if self.arm_control_handler is None:
+            logger.warning("Arm control handler not available")
+            return
+
+        if not self.detected_objects:
+            logger.warning("No objects detected for pick and stack operation")
+            self.state = PipelineState.DETECTING
+            return
+
+        try:
+            # Get process parameters for arm control
+            process_params = self.config_handlers.get("arm_control", {}).get("process", {})
+
+            # Ensure task is set to pick_and_stack
+            process_params["task"] = "pick_and_stack"
+
+            # Process objects with arm control handler
+            result = self.arm_control_handler.process(self.detected_objects, **process_params)
+            failed = result.get("failed", [])
+
+            if failed:
+                logger.info(
+                    f"Failed to pick and stack {len(failed)} objects: {','.join([obj['label'] for obj in failed])}"
+                )
+
+            logger.info("Pick and stack tried, back to detection state")
+            self.state = PipelineState.DETECTING
+
+        except Exception as e:
+            logger.error(f"Error in pick and stack operation: {e}")
+
+    def get_instance_meta(self) -> Dict[str, Any]:
+        """Return instance-specific metadata based on current configuration.
+
+        This allows for dynamic signals and states based on the task type.
+        """
+        task = self.config_handlers.get("arm_control", {}).get("init", {}).get("task", "pick_and_place")
+
+        # Base states and signals that are always available
+        base_states = [
+            PipelineState.IDLE.value,
+            PipelineState.CALIBRATING.value,
+            PipelineState.DETECTING.value,
+            PipelineState.STOPPED.value,
+        ]
+
+        base_signals = [
+            PipelineSignal.RESET_ARM.value,
+            PipelineSignal.RE_CALIBRATE.value,
+            PipelineSignal.CALIBRATION_CONFIRMED.value,
+            PipelineSignal.STOP.value,
+        ]
+
+        # Task-specific states and signals
+        if task == "pick_and_stack":
+            meta = {
+                "available_states": [*base_states, PipelineState.PICKING_STACKING.value],
+                "available_signals": [*base_signals, PipelineSignal.PICK_STACK.value],
+                "available_queues": [queue.value for queue in PipelineQueue],
+            }
+        else:  # Default to pick_and_place
+            meta = {
+                "available_states": [*base_states, PipelineState.PICKING_PLACING.value],
+                "available_signals": [*base_signals, PipelineSignal.PICK_PLACE.value],
+                "available_queues": [queue.value for queue in PipelineQueue],
+            }
+
+        return meta

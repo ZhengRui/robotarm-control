@@ -193,12 +193,17 @@ class PipelineProcess:
         # Signal handling flags
         stop_event = threading.Event()
 
+        # Status update tracking
+        last_status_time = 0.0
+        STATUS_UPDATE_INTERVAL = 1.0  # Update status every 1 second
+
         try:
             # Create pipeline instance with pipeline_name
             pipeline = pipeline_class(pipeline_name=pipeline_name, config_override=config_override)
 
             # Initial status update
             _send_status(pipeline, status_queue, stop_event)
+            last_status_time = time.time()
 
             # Start signal handling thread
             signal_thread = threading.Thread(
@@ -213,9 +218,11 @@ class PipelineProcess:
                     # Run one pipeline step
                     pipeline.step()
 
-                    # Periodically update status (every ~1 second)
-                    if int(time.time()) % 1 == 0:
+                    # Periodically update status
+                    current_time = time.time()
+                    if current_time - last_status_time >= STATUS_UPDATE_INTERVAL:
                         _send_status(pipeline, status_queue, stop_event)
+                        last_status_time = current_time
 
                     # Small sleep to prevent CPU spinning
                     time.sleep(0.01)
@@ -320,6 +327,11 @@ def _send_status(pipeline: BasePipeline, status_queue: multiprocessing.Queue, st
             "state": pipeline.current_state if running else "stopped",
             "timestamp": time.time(),
         }
+
+        # Add instance-specific metadata if available
+        if hasattr(pipeline, "get_instance_meta") and callable(getattr(pipeline, "get_instance_meta")):
+            instance_meta = pipeline.get_instance_meta()
+            status.update(instance_meta)
 
         # Send to main process
         status_queue.put(status)
