@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useLayoutEffect, useCallback } from "react";
+import { useState, useLayoutEffect, useCallback, useEffect } from "react";
 import { useAtom } from "jotai";
 import {
   Select,
@@ -15,7 +15,7 @@ import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import { Card, CardContent } from "@/components/ui/card";
 import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels";
-import { Loader2 } from "lucide-react";
+import { Loader2, WifiOff, RefreshCw } from "lucide-react";
 import {
   selectedPipelineNameAtom,
   selectedSignalAtom,
@@ -71,7 +71,34 @@ const Dashboard = () => {
   const { mutate: sendSignal } = useSendSignal();
 
   // WebSocket connection
-  usePipelineWebSocket(selectedPipelineName);
+  const { connectionStatus, reconnect } =
+    usePipelineWebSocket(selectedPipelineName);
+
+  // Check if pipeline is running but websocket is disconnected
+  useEffect(() => {
+    // Only attempt reconnection when the pipeline is running AND we're in a disconnected state
+    // NOT when we're already connecting or any other state transitions
+    if (
+      pipelineRunning &&
+      selectedPipelineName &&
+      connectionStatus === "disconnected"
+    ) {
+      // Add a small delay to prevent rapid reconnection cycles
+      const reconnectTimer = setTimeout(() => {
+        console.log(
+          `Attempting to reconnect to pipeline ${selectedPipelineName}`
+        );
+        reconnect();
+      }, 500);
+
+      return () => clearTimeout(reconnectTimer);
+    }
+  }, [
+    pipelineRunning,
+    selectedPipelineName,
+    connectionStatus === "disconnected",
+    reconnect,
+  ]);
 
   const MIN_SIZE_IN_PIXELS = 400;
   const MAX_SIZE_IN_PIXELS = 500;
@@ -304,6 +331,32 @@ const Dashboard = () => {
                     </p>
                   )}
                 </div>
+
+                {/* Connection status indicator */}
+                {selectedPipelineName &&
+                  (connectionStatus === "disconnected" ||
+                    connectionStatus === "error") && (
+                    <div className="flex items-center justify-between gap-2 px-5 py-2 bg-yellow-50 text-yellow-700 text-xs">
+                      <div className="flex items-center gap-1.5">
+                        <WifiOff className="h-3.5 w-3.5" />
+                        <span>Connection lost to pipeline</span>
+                      </div>
+                      <button
+                        onClick={reconnect}
+                        className="flex items-center gap-1 hover:text-yellow-900 transition-colors"
+                      >
+                        <RefreshCw className="h-3 w-3" />
+                        <span>Reconnect</span>
+                      </button>
+                    </div>
+                  )}
+
+                {selectedPipelineName && connectionStatus === "connecting" && (
+                  <div className="flex items-center gap-1.5 px-5 py-2 bg-blue-50 text-blue-700 text-xs">
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    <span>Connecting to pipeline...</span>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </div>
@@ -524,6 +577,33 @@ const Dashboard = () => {
                         </p>
                       )}
                     </div>
+
+                    {/* Connection status indicator */}
+                    {selectedPipelineName &&
+                      (connectionStatus === "disconnected" ||
+                        connectionStatus === "error") && (
+                        <div className="flex items-center justify-between gap-2 px-5 py-2 bg-yellow-50 text-yellow-700 text-xs">
+                          <div className="flex items-center gap-1.5">
+                            <WifiOff className="h-3.5 w-3.5" />
+                            <span>Connection lost to pipeline</span>
+                          </div>
+                          <button
+                            onClick={reconnect}
+                            className="flex items-center gap-1 hover:text-yellow-900 transition-colors"
+                          >
+                            <RefreshCw className="h-3 w-3" />
+                            <span>Reconnect</span>
+                          </button>
+                        </div>
+                      )}
+
+                    {selectedPipelineName &&
+                      connectionStatus === "connecting" && (
+                        <div className="flex items-center gap-1.5 px-5 py-2 bg-blue-50 text-blue-700 text-xs">
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          <span>Connecting to pipeline...</span>
+                        </div>
+                      )}
                   </CardContent>
                 </Card>
               </Panel>
