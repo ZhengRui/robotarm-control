@@ -1,7 +1,7 @@
 启动四个脚本：
 
 
-mac：
+mac / linux：
 - backend
   - cd backend/ ; src .venv/bin/activate
   - uv sync
@@ -13,6 +13,11 @@ mac：
 
 
 linux：
+- clash
+  - cd Work/Libs/clash
+  - sudo ./restart.sh
+
+
 - 视频流发送端
   - cd backend/ ; src .venv/bin/activate
   - python -m examples.streaming --server 192.168.1.37  --source webcam:0 --keep_size --enable_freeze --visualization --time-window 0.1
