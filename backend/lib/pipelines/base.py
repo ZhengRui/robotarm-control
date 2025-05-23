@@ -198,8 +198,9 @@ class BasePipeline(ABC):
         # Initialize handlers based on config keys
         for handler_type, handler_config in self.config.get("handlers", {}).items():
             try:
-                # Extract initialization parameters from the 'init' section if it exists
-                init_params = handler_config.get("init", {}).copy()
+                # Handle both None handler_config and None init section
+                handler_config = handler_config or {}
+                init_params = (handler_config.get("init") or {}).copy()
 
                 if handler_type == "data_loader":
                     redis_config = self.config.get("redis", {})

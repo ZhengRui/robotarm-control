@@ -1,0 +1,16 @@
+Pipeline:
+  redis:
+    host: "127.0.0.1"
+    port: 6379
+    db: 0
+    password: null
+
+  handlers:
+    data_loader:
+      init:
+        backend: "redis"
+      process:
+        queue: "camera_frames"
+        wait: false
+
+    calibrate:

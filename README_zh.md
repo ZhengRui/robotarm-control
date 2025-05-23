@@ -672,26 +672,44 @@ class CustomHandler(BaseHandler):
 
 </details>
 
-### 5. 注册处理器和管道
+### 5. 注册处理器
 
-在您的管道模块的 `__init__.py` 中，注册处理器和管道：
+在您的管道模块的 `__init__.py` 中，注册处理器：
 
 ```python
-from ....handlers import HandlerFactory
-from ...factory import PipelineFactory
+from ...handlers import HandlerFactory
 from .handlers.custom_handler import CustomHandler
 from .pipeline import Pipeline
 
 # 为此管道注册自定义处理器
 HandlerFactory.register_for_pipeline(Pipeline, "custom_handler", CustomHandler)
 
-# 向工厂注册管道
-PipelineFactory.register_pipeline("my_custom_pipeline", Pipeline)
-
 __all__ = ["Pipeline", "CustomHandler"]
 ```
 
-### 6. 将管道添加到环境配置
+### 6. 注册管道
+
+在主 `backend/lib/pipelines/__init__.py` 文件中，注册您的管道：
+
+```python
+# 添加您的导入
+from .my_custom_pipeline import Pipeline as MyCustomPipeline
+
+# 添加您的管道注册
+PipelineFactory.register_pipeline("my_custom_pipeline", MyCustomPipeline)
+
+# 更新 __all__ 以包含您的管道
+__all__ = [
+    "BasePipeline",
+    "PipelineFactory",
+    "SignalPriority",
+    "YahboomPickAndPlacePipeline",
+    "ModulusPipeline",
+    "MyCustomPipeline",  # 添加此行
+]
+```
+
+### 7. 将管道添加到环境配置
 
 将您的管道添加到您的环境配置文件中（例如，`backend/config/dev.yaml`）：
 
@@ -710,7 +728,7 @@ my_custom_pipeline:
          parameter1: "custom_value"
 ```
 
-### 7. 使用您的自定义管道
+### 8. 使用您的自定义管道
 
 实现后，您可以通过 API 使用您的管道：
 

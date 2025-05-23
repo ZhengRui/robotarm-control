@@ -672,26 +672,44 @@ class CustomHandler(BaseHandler):
 
 </details>
 
-### 5. Register Handlers and Pipeline
+### 5. Register Handlers
 
-In your pipeline module's `__init__.py`, register the handlers and pipeline:
+In your pipeline module's `__init__.py`, register the handlers:
 
 ```python
-from ....handlers import HandlerFactory
-from ...factory import PipelineFactory
+from ...handlers import HandlerFactory
 from .handlers.custom_handler import CustomHandler
 from .pipeline import Pipeline
 
 # Register custom handlers for this pipeline
 HandlerFactory.register_for_pipeline(Pipeline, "custom_handler", CustomHandler)
 
-# Register the pipeline with the factory
-PipelineFactory.register_pipeline("my_custom_pipeline", Pipeline)
-
 __all__ = ["Pipeline", "CustomHandler"]
 ```
 
-### 6. Add Pipeline to Environment Configuration
+### 6. Register Pipeline
+
+In the main `backend/lib/pipelines/__init__.py` file, register your pipeline:
+
+```python
+# Add your import
+from .my_custom_pipeline import Pipeline as MyCustomPipeline
+
+# Add your pipeline registration
+PipelineFactory.register_pipeline("my_custom_pipeline", MyCustomPipeline)
+
+# Update __all__ to include your pipeline
+__all__ = [
+    "BasePipeline",
+    "PipelineFactory",
+    "SignalPriority",
+    "YahboomPickAndPlacePipeline",
+    "ModulusPipeline",
+    "MyCustomPipeline",  # Add this line
+]
+```
+
+### 7. Add Pipeline to Environment Configuration
 
 Add your pipeline to your environment configuration file (e.g., `backend/config/dev.yaml`):
 
@@ -710,7 +728,7 @@ my_custom_pipeline:
          parameter1: "custom_value"
 ```
 
-### 7. Using Your Custom Pipeline
+### 8. Using Your Custom Pipeline
 
 After implementation, you can use your pipeline through the API:
 
